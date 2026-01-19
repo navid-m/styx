@@ -596,6 +596,15 @@ class ProtonManagerDialog(
 
         val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
 
+        val clearBtn = JButton("Clear (Use Wine)").apply {
+            preferredSize = Dimension(130, 32)
+            addActionListener { 
+                protonCombo.selectedIndex = 0 // Select "Wine (default)"
+                selectedProton = null
+                dispose()
+            }
+        }
+
         val applyBtn = JButton("Apply Proton Version").apply {
             preferredSize = Dimension(150, 32)
             addActionListener { applyProton() }
@@ -606,6 +615,7 @@ class ProtonManagerDialog(
             addActionListener { dispose() }
         }
 
+        buttonPanel.add(clearBtn)
         buttonPanel.add(applyBtn)
         buttonPanel.add(cancelBtn)
 
@@ -873,7 +883,8 @@ class GameItemWidget(
     private val game: Game,
     private val onLaunch: (Game) -> Unit,
     private val onChangePrefix: (Game) -> Unit,
-    private val onProtonManager: (Game) -> Unit
+    private val onProtonManager: (Game) -> Unit,
+    private val onPrefixManager: (Game) -> Unit
 ) : JPanel() {
 
     init {
@@ -904,6 +915,15 @@ class GameItemWidget(
 
         add(infoPanel)
         add(Box.createHorizontalGlue())
+
+        val wpmBtn = JButton("WPM").apply {
+            preferredSize = Dimension(90, 28)
+            maximumSize = Dimension(90, 28)
+            toolTipText = "Wineprefix Manager (Winetricks)"
+            addActionListener { onPrefixManager(game) }
+        }
+        add(wpmBtn)
+        add(Box.createHorizontalStrut(5))
 
         val pmwBtn = JButton("PMW").apply {
             preferredSize = Dimension(90, 28)
@@ -1067,7 +1087,7 @@ class GameLauncher : JFrame("Hydra") {
         gamesContainer.removeAll()
 
         games.forEach { game ->
-            val gameWidget = GameItemWidget(game, ::launchGame, ::changeGamePrefix, ::openProtonManager)
+            val gameWidget = GameItemWidget(game, ::launchGame, ::changeGamePrefix, ::openProtonManager, ::openPrefixManager)
             gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 60)
             gamesContainer.add(gameWidget)
             gamesContainer.add(Box.createVerticalStrut(5))
@@ -1151,7 +1171,7 @@ class GameLauncher : JFrame("Hydra") {
         val gameInList = games.find { it.name == game.name }
         if (gameInList != null) {
             if (dialog.selectedProton == null) {
-                gameInList.protonVersion = "Wine (default)"
+                gameInList.protonVersion = null
                 gameInList.protonPath = null
                 gameInList.protonBin = null
                 statusLabel.text = "Set ${game.name} to use Wine (default)"
@@ -1165,6 +1185,74 @@ class GameLauncher : JFrame("Hydra") {
             saveGames()
             refreshGamesList()
         }
+    }
+
+    private fun openPrefixManager(game: Game) {
+        val prefixPath = game.prefix
+        
+        if (!File(prefixPath).exists()) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Wine prefix not found: $prefixPath",
+                "Error",
+                JOptionPane.ERROR_MESSAGE
+            )
+            return
+        }
+
+        Thread {
+            try {
+                val whichProcess = ProcessBuilder("which", "winetricks").start()
+                whichProcess.waitFor()
+
+                if (whichProcess.exitValue() != 0) {
+                    SwingUtilities.invokeLater {
+                        JOptionPane.showMessageDialog(
+                            this,
+                            "Winetricks is not installed or not found in PATH.\n\n" +
+                                    "Please install winetricks to use this feature:\n" +
+                                    "• Ubuntu/Debian: sudo apt install winetricks\n" +
+                                    "• Arch: sudo pacman -S winetricks\n" +
+                                    "• Fedora: sudo dnf install winetricks",
+                            "Winetricks Not Found",
+                            JOptionPane.WARNING_MESSAGE
+                        )
+                    }
+                    return@Thread
+                }
+
+                SwingUtilities.invokeLater {
+                    statusLabel.text = "Launching Winetricks for ${game.name}..."
+                }
+
+                val processBuilder = ProcessBuilder()
+                processBuilder.environment()["WINEPREFIX"] = prefixPath
+                processBuilder.command("winetricks")
+
+                val process = processBuilder.start()
+
+                val exitCode = process.waitFor()
+
+                SwingUtilities.invokeLater {
+                    if (exitCode == 0) {
+                        statusLabel.text = "Winetricks closed for ${game.name}"
+                    } else {
+                        statusLabel.text = "Winetricks exited with code $exitCode for ${game.name}"
+                    }
+                }
+
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "Failed to launch Winetricks: ${e.message}",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                    statusLabel.text = "Failed to launch Winetricks"
+                }
+            }
+        }.start()
     }
 
     private fun checkWineAvailability(outputWindow: GameOutputWindow): Boolean {
