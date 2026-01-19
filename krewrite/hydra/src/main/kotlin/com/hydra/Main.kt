@@ -31,13 +31,18 @@ data class PrefixInfo(
  * The game output window.
  * This is used for debug output from the game.
  */
-class GameOutputWindow(private val gameName: String, parent: JFrame? = null) : JFrame("Game Output - $gameName") {
-    private val outputText = JTextPane()
+class GameOutputWindow(private val gameName: String, parent: JFrame? = null, private val onAbort: ((String) -> Unit)? = null) : JFrame("Game Output - $gameName") {
+    private val outputText = JTextArea()
     private val verboseCheckbox = JCheckBox("Verbose Mode (show all Wine debug)", false)
-    private val maxLines = 10000
+    private val abortBtn = JButton("Abort Launch")
+    private val maxDisplayLines = 5000
+    private val fullLogBuffer = mutableListOf<String>()
+    private val displayBuffer = mutableListOf<String>()
+    private var needsUIUpdate = false
 
     init {
         initUI()
+        startUIUpdateTimer()
     }
 
     private fun initUI() {
@@ -58,10 +63,22 @@ class GameOutputWindow(private val gameName: String, parent: JFrame? = null) : J
 
         outputText.isEditable = false
         outputText.font = Font("Monospaced", Font.PLAIN, 9)
+        outputText.lineWrap = false
         val scrollPane = JScrollPane(outputText)
         contentPanel.add(scrollPane, BorderLayout.CENTER)
 
         val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
+
+        abortBtn.apply {
+            preferredSize = Dimension(120, 32)
+            background = Color(0xCC, 0x00, 0x00)
+            foreground = Color.WHITE
+            font = font.deriveFont(Font.BOLD)
+            addActionListener { 
+                onAbort?.invoke(gameName)
+            }
+        }
+        buttonPanel.add(abortBtn)
 
         val saveBtn = JButton("Save Log").apply {
             preferredSize = Dimension(100, 32)
@@ -86,38 +103,65 @@ class GameOutputWindow(private val gameName: String, parent: JFrame? = null) : J
         contentPane = contentPanel
     }
 
+    private fun startUIUpdateTimer() {
+        val timer = javax.swing.Timer(200) {
+            updateUI()
+        }
+        timer.start()
+    }
+
+    private fun updateUI() {
+        if (!needsUIUpdate) return
+        
+        synchronized(displayBuffer) {
+            if (displayBuffer.isEmpty()) return
+            
+            val text = displayBuffer.takeLast(maxDisplayLines).joinToString("\n")
+            
+            SwingUtilities.invokeLater {
+                outputText.text = text
+                outputText.caretPosition = outputText.text.length
+            }
+            
+            needsUIUpdate = false
+        }
+    }
+
     fun appendOutput(text: String, color: String? = null) {
-        SwingUtilities.invokeLater {
-            val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
-            val doc = outputText.styledDocument
-            val style = outputText.addStyle("Style", null)
-
-            if (color != null) {
-                javax.swing.text.StyleConstants.setForeground(style, Color.decode(color))
-            } else {
-                javax.swing.text.StyleConstants.setForeground(style, Color.BLACK)
+        val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
+        val logLine = "[$timestamp] $text"
+        
+        synchronized(fullLogBuffer) {
+            fullLogBuffer.add(logLine)
+        }
+        
+        synchronized(displayBuffer) {
+            displayBuffer.add(logLine)
+            if (displayBuffer.size > maxDisplayLines * 2) {
+                val toKeep = displayBuffer.takeLast(maxDisplayLines)
+                displayBuffer.clear()
+                displayBuffer.addAll(toKeep)
             }
-
-            try {
-                doc.insertString(doc.length, "[$timestamp] $text\n", style)
-              
-                val root = doc.defaultRootElement
-                val lineCount = root.elementCount
-                if (lineCount > maxLines) {
-                    val linesToRemove = lineCount - maxLines
-                    val endOffset = root.getElement(linesToRemove).startOffset
-                    doc.remove(0, endOffset)
-                }
-                
-                outputText.caretPosition = doc.length
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            needsUIUpdate = true
         }
     }
 
     fun clearOutput() {
-        outputText.text = ""
+        synchronized(fullLogBuffer) {
+            fullLogBuffer.clear()
+        }
+        synchronized(displayBuffer) {
+            displayBuffer.clear()
+        }
+        SwingUtilities.invokeLater {
+            outputText.text = ""
+        }
+    }
+
+    fun disableAbortButton() {
+        SwingUtilities.invokeLater {
+            abortBtn.isEnabled = false
+        }
     }
 
     private fun saveLog() {
@@ -127,10 +171,13 @@ class GameOutputWindow(private val gameName: String, parent: JFrame? = null) : J
 
         if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
             try {
-                chooser.selectedFile.writeText(outputText.text)
+                val fullLog = synchronized(fullLogBuffer) {
+                    fullLogBuffer.joinToString("\n")
+                }
+                chooser.selectedFile.writeText(fullLog)
                 JOptionPane.showMessageDialog(
                     this,
-                    "Log saved to ${chooser.selectedFile.absolutePath}",
+                    "Log saved to ${chooser.selectedFile.absolutePath}\nTotal lines: ${fullLogBuffer.size}",
                     "Success",
                     JOptionPane.INFORMATION_MESSAGE
                 )
@@ -1128,7 +1175,9 @@ class GameLauncher : JFrame("Hydra") {
             return
         }
 
-        val outputWindow = GameOutputWindow(gameName, this)
+        val outputWindow = GameOutputWindow(gameName, this) { abortGameName ->
+            abortGameLaunch(abortGameName)
+        }
         outputWindows[gameName] = outputWindow
         outputWindow.isVisible = true
 
@@ -1307,6 +1356,7 @@ class GameLauncher : JFrame("Hydra") {
                         )
                     }
 
+                    outputWindow.disableAbortButton()
                     gameProcesses.remove(gameName)
                     statusLabel.text = "$gameName exited (code: $exitCode)"
                 }
@@ -1322,6 +1372,7 @@ class GameLauncher : JFrame("Hydra") {
                 outputWindow.appendOutput("  at $element", "#cc0000")
             }
 
+            outputWindow.disableAbortButton()
             JOptionPane.showMessageDialog(
                 this,
                 "Failed to launch game: ${e.message}",
@@ -1329,6 +1380,48 @@ class GameLauncher : JFrame("Hydra") {
                 JOptionPane.ERROR_MESSAGE
             )
             statusLabel.text = "Launch failed"
+        }
+    }
+
+    private fun abortGameLaunch(gameName: String) {
+        val process = gameProcesses[gameName]
+        if (process != null && process.isAlive) {
+            val result = JOptionPane.showConfirmDialog(
+                this,
+                "Are you sure you want to abort the launch of '$gameName'?",
+                "Abort Launch",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+            )
+
+            if (result == JOptionPane.YES_OPTION) {
+                val outputWindow = outputWindows[gameName]
+                outputWindow?.appendOutput("")
+                outputWindow?.appendOutput("═".repeat(60), "#cc6600")
+                outputWindow?.appendOutput("ABORTING LAUNCH", "#cc6600")
+                outputWindow?.appendOutput("═".repeat(60), "#cc6600")
+                outputWindow?.appendOutput("User requested abort. Terminating process...", "#cc6600")
+
+                process.destroy()
+                Thread.sleep(1000)
+
+                if (process.isAlive) {
+                    process.destroyForcibly()
+                }
+
+                outputWindow?.appendOutput("Process terminated.", "#cc0000")
+                outputWindow?.disableAbortButton()
+
+                gameProcesses.remove(gameName)
+                statusLabel.text = "Aborted launch of $gameName"
+            }
+        } else {
+            JOptionPane.showMessageDialog(
+                this,
+                "No active process found for '$gameName'.",
+                "Info",
+                JOptionPane.INFORMATION_MESSAGE
+            )
         }
     }
 }
