@@ -538,11 +538,6 @@ class ProtonManagerDialog(
         mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
         mainPanel.border = EmptyBorder(10, 10, 10, 10)
 
-        val titleLabel = JLabel("Select Proton Version")
-        titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 11f)
-        titleLabel.border = EmptyBorder(0, 0, 10, 0)
-        mainPanel.add(titleLabel)
-
         val currentGroup = JPanel(BorderLayout())
         currentGroup.border = BorderFactory.createTitledBorder("Current Configuration")
         val currentProton = game.protonVersion ?: "Wine (default)"
@@ -1076,25 +1071,25 @@ class GameItemWidget(
         add(infoPanel)
         add(Box.createHorizontalGlue())
 
-        val loBtn = JButton("LO").apply {
-            preferredSize = Dimension(80, 28)
-            maximumSize = Dimension(80, 28)
+        val loBtn = JButton("Params").apply {
+            preferredSize = Dimension(100, 28)
+            maximumSize = Dimension(100, 28)
             toolTipText = "Launch Options"
             addActionListener { onLaunchOptions(game) }
         }
         add(loBtn)
         add(Box.createHorizontalStrut(5))
 
-        val wpmBtn = JButton("WPM").apply {
-            preferredSize = Dimension(90, 28)
-            maximumSize = Dimension(90, 28)
+        val wpmBtn = JButton("Winetricks").apply {
+            preferredSize = Dimension(100, 28)
+            maximumSize = Dimension(100, 28)
             toolTipText = "Wineprefix Manager (Winetricks)"
             addActionListener { onPrefixManager(game) }
         }
         add(wpmBtn)
         add(Box.createHorizontalStrut(5))
 
-        val pmwBtn = JButton("PMW").apply {
+        val pmwBtn = JButton("Proton").apply {
             preferredSize = Dimension(90, 28)
             maximumSize = Dimension(90, 28)
             toolTipText = "Proton Manager Window"
