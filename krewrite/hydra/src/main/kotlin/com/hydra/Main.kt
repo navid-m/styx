@@ -845,7 +845,7 @@ class LaunchOptionsDialog(
         } else {
             JOptionPane.showMessageDialog(
                 this,
-                "Please select a row to remove.",
+                "You need to select a row to remove.",
                 "No Selection",
                 JOptionPane.INFORMATION_MESSAGE
             )
@@ -1387,7 +1387,7 @@ class GameLauncher : JFrame("Hydra") {
                         JOptionPane.showMessageDialog(
                             this,
                             "Winetricks is not installed or not found in PATH.\n\n" +
-                                    "Please install winetricks to use this feature:\n" +
+                                    "Install winetricks to use this feature:\n" +
                                     "• Ubuntu/Debian: sudo apt install winetricks\n" +
                                     "• Arch: sudo pacman -S winetricks\n" +
                                     "• Fedora: sudo dnf install winetricks",
