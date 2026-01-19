@@ -352,6 +352,194 @@ class RenameGameDialog(QDialog):
         self.accept()
 
 
+class ProtonManagerDialog(QDialog):
+    """Dialog for managing Proton versions for a game"""
+
+    def __init__(self, game: Dict[str, str], parent=None):
+        super().__init__(parent)
+        self.game = game
+        self.selected_proton = None
+        self.available_protons = []
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle(f"Proton Manager - {self.game['name']}")
+        self.setMinimumWidth(600)
+        self.setMinimumHeight(450)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+
+        title_label = QLabel("Select Proton Version")
+        title_font = QFont()
+        title_font.setPointSize(11)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        layout.addWidget(title_label)
+
+        current_group = QGroupBox("Current Configuration")
+        current_layout = QVBoxLayout()
+        current_proton = self.game.get("proton_version", "Wine (default)")
+        current_label = QLabel(f"Current: {current_proton}")
+        current_label.setWordWrap(True)
+        current_layout.addWidget(current_label)
+        current_group.setLayout(current_layout)
+        layout.addWidget(current_group)
+
+        scan_btn = QPushButton("Scan for Proton Versions")
+        scan_btn.setMinimumHeight(32)
+        scan_btn.clicked.connect(self.scan_proton_versions)
+        layout.addWidget(scan_btn)
+
+        proton_group = QGroupBox("Available Proton Versions")
+        proton_layout = QVBoxLayout()
+
+        self.proton_combo = QComboBox()
+        self.proton_combo.addItem("Wine (default)", None)
+        proton_layout.addWidget(self.proton_combo)
+
+        info_label = QLabel(
+            "Proton versions are typically found in:\n"
+            "• ~/.steam/steam/steamapps/common/\n"
+            "• ~/.steam/steam/compatibilitytools.d/\n"
+            "• Custom paths you specify"
+        )
+        info_label.setStyleSheet("color: #666; font-size: 9pt;")
+        info_label.setWordWrap(True)
+        proton_layout.addWidget(info_label)
+
+        browse_layout = QHBoxLayout()
+        browse_label = QLabel("Custom Proton Path:")
+        browse_layout.addWidget(browse_label)
+
+        self.custom_path_input = QLineEdit()
+        self.custom_path_input.setPlaceholderText("Browse to custom Proton installation...")
+        browse_layout.addWidget(self.custom_path_input)
+
+        browse_btn = QPushButton("Browse...")
+        browse_btn.setMaximumWidth(100)
+        browse_btn.clicked.connect(self.browse_custom_proton)
+        browse_layout.addWidget(browse_btn)
+
+        proton_layout.addLayout(browse_layout)
+        proton_group.setLayout(proton_layout)
+        layout.addWidget(proton_group)
+
+        layout.addStretch()
+
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        apply_btn = QPushButton("Apply Proton Version")
+        apply_btn.setMinimumWidth(150)
+        apply_btn.setMinimumHeight(32)
+        apply_btn.clicked.connect(self.apply_proton)
+        button_layout.addWidget(apply_btn)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setMinimumWidth(80)
+        cancel_btn.setMinimumHeight(32)
+        cancel_btn.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_btn)
+
+        layout.addLayout(button_layout)
+
+        self.setLayout(layout)
+
+        self.scan_proton_versions()
+
+    def scan_proton_versions(self):
+        """Scan for available Proton installations"""
+        self.proton_combo.clear()
+        self.proton_combo.addItem("Wine (default)", None)
+        self.available_protons = []
+
+        steam_paths = [
+            Path.home() / ".steam" / "steam" / "steamapps" / "common",
+            Path.home() / ".steam" / "steam" / "compatibilitytools.d",
+            Path.home() / ".local" / "share" / "Steam" / "steamapps" / "common",
+            Path.home() / ".local" / "share" / "Steam" / "compatibilitytools.d",
+        ]
+
+        for steam_path in steam_paths:
+            if not steam_path.exists():
+                continue
+
+            try:
+                for item in steam_path.iterdir():
+                    if item.is_dir() and "proton" in item.name.lower():
+                        proton_bin = item / "proton"
+                        if proton_bin.exists():
+                            proton_info = {
+                                "name": item.name,
+                                "path": str(item),
+                                "proton_bin": str(proton_bin),
+                            }
+                            self.available_protons.append(proton_info)
+                            self.proton_combo.addItem(
+                                f"{item.name} ({steam_path.name})", proton_info
+                            )
+            except (PermissionError, OSError):
+                continue
+
+        if self.available_protons:
+            QMessageBox.information(
+                self,
+                "Scan Complete",
+                f"Found {len(self.available_protons)} Proton version(s).",
+            )
+        else:
+            QMessageBox.information(
+                self, "Scan Complete", "No Proton versions found in standard locations."
+            )
+
+        current_proton = self.game.get("proton_version")
+        if current_proton and current_proton != "Wine (default)":
+            for i in range(self.proton_combo.count()):
+                data = self.proton_combo.itemData(i)
+                if data and data.get("name") == current_proton:
+                    self.proton_combo.setCurrentIndex(i)
+                    break
+
+    def browse_custom_proton(self):
+        """Browse for a custom Proton installation"""
+        dir_path = QFileDialog.getExistingDirectory(
+            self, "Select Proton Installation Directory"
+        )
+        if dir_path:
+            proton_path = Path(dir_path)
+            proton_bin = proton_path / "proton"
+
+            if not proton_bin.exists():
+                QMessageBox.warning(
+                    self,
+                    "Invalid Proton Directory",
+                    "The selected directory does not contain a 'proton' executable.",
+                )
+                return
+
+            self.custom_path_input.setText(dir_path)
+            proton_info = {
+                "name": f"Custom - {proton_path.name}",
+                "path": str(proton_path),
+                "proton_bin": str(proton_bin),
+            }
+            self.proton_combo.addItem(proton_info["name"], proton_info)
+            self.proton_combo.setCurrentIndex(self.proton_combo.count() - 1)
+
+    def apply_proton(self):
+        """Apply the selected Proton version"""
+        current_data = self.proton_combo.currentData()
+
+        if current_data is None:
+            self.selected_proton = None
+        else:
+            self.selected_proton = current_data
+
+        self.accept()
+
+
 class ChangePrefixDialog(QDialog):
     """Dialog for changing a game's Wine prefix"""
 
@@ -574,6 +762,7 @@ class GameItemWidget(QWidget):
     launch_clicked = Signal(dict)
     change_prefix_clicked = Signal(dict)
     rename_clicked = Signal(dict)
+    proton_manager_clicked = Signal(dict)
 
     def __init__(self, game: Dict[str, str], parent=None):
         super().__init__(parent)
@@ -603,6 +792,14 @@ class GameItemWidget(QWidget):
         info_layout.addWidget(prefix_label)
 
         layout.addLayout(info_layout, 1)
+
+        # Buttons
+        pmw_btn = QPushButton("PMW")
+        pmw_btn.setMinimumHeight(28)
+        pmw_btn.setMaximumWidth(60)
+        pmw_btn.setToolTip("Proton Manager Window")
+        pmw_btn.clicked.connect(lambda: self.proton_manager_clicked.emit(self.game))
+        layout.addWidget(pmw_btn)
 
         rename_btn = QPushButton("Rename")
         rename_btn.setMinimumHeight(28)
@@ -765,6 +962,7 @@ class GameLauncher(QMainWindow):
             game_widget.launch_clicked.connect(self.launch_game)
             game_widget.change_prefix_clicked.connect(self.change_game_prefix)
             game_widget.rename_clicked.connect(self.rename_game)
+            game_widget.proton_manager_clicked.connect(self.open_proton_manager)
             self.games_layout.insertWidget(self.games_layout.count(), game_widget)
             self.game_widgets.append(game_widget)
 
@@ -836,6 +1034,29 @@ class GameLauncher(QMainWindow):
                     self.statusBar().showMessage(
                         f"Renamed '{old_name}' to '{dialog.new_name}'"
                     )
+                    break
+
+    def open_proton_manager(self, game: Dict[str, str]):
+        """Open Proton Manager dialog for a game"""
+        dialog = ProtonManagerDialog(game, self)
+        if dialog.exec() == QDialog.Accepted:
+            for g in self.games:
+                if g["name"] == game["name"]:
+                    if dialog.selected_proton is None:
+                        g["proton_version"] = "Wine (default)"
+                        g.pop("proton_path", None)
+                        self.statusBar().showMessage(
+                            f"Set {game['name']} to use Wine (default)"
+                        )
+                    else:
+                        g["proton_version"] = dialog.selected_proton["name"]
+                        g["proton_path"] = dialog.selected_proton["path"]
+                        g["proton_bin"] = dialog.selected_proton["proton_bin"]
+                        self.statusBar().showMessage(
+                            f"Set {game['name']} to use {dialog.selected_proton['name']}"
+                        )
+                    self.save_games()
+                    self.refresh_games_list()
                     break
 
     def check_wine_availability(self, output_window: GameOutputWindow):
@@ -912,6 +1133,13 @@ class GameLauncher(QMainWindow):
         output_window.append_output(f"Executable: {exe_path}")
         output_window.append_output(f"Working Directory: {Path(exe_path).parent}")
         output_window.append_output(f"Wine Prefix: {prefix_path}")
+        
+        use_proton = game.get("proton_bin") is not None
+        if use_proton:
+            proton_version = game.get("proton_version", "Unknown")
+            output_window.append_output(f"Compatibility Layer: {proton_version}", "#00aa00")
+        else:
+            output_window.append_output("Compatibility Layer: Wine (default)", "#00aa00")
 
         if os.path.exists(prefix_path):
             system_reg = Path(prefix_path) / "system.reg"
@@ -932,6 +1160,10 @@ class GameLauncher(QMainWindow):
             env = QProcess.systemEnvironment()
             env.append(f"WINEPREFIX={prefix_path}")
 
+            if use_proton:
+                env.append(f"STEAM_COMPAT_DATA_PATH={prefix_path}")
+                env.append(f"STEAM_COMPAT_CLIENT_INSTALL_PATH={game.get('proton_path', '')}")
+
             if output_window.verbose_checkbox.isChecked():
                 env.append("WINEDEBUG=+all")
                 output_window.append_output(
@@ -949,7 +1181,7 @@ class GameLauncher(QMainWindow):
             output_window.append_output("")
             output_window.append_output("=== Environment Variables ===", "#0066cc")
             for var in env:
-                if any(var.startswith(prefix) for prefix in ["WINE", "DISPLAY"]):
+                if any(var.startswith(prefix) for prefix in ["WINE", "DISPLAY", "STEAM_COMPAT"]):
                     output_window.append_output(f"  {var}")
             output_window.append_output("")
 
@@ -986,11 +1218,19 @@ class GameLauncher(QMainWindow):
 
             exe_path_abs = os.path.abspath(exe_path)
 
-            output_window.append_output("=== Starting Wine Process ===", "#0066cc")
-            output_window.append_output(f"Command: wine {exe_path_abs}")
-            output_window.append_output("")
+            if use_proton:
+                proton_bin = game.get("proton_bin")
+                output_window.append_output("=== Starting Proton Process ===", "#0066cc")
+                output_window.append_output(f"Command: {proton_bin} run {exe_path_abs}")
+                output_window.append_output("")
 
-            process.start("wine", [exe_path_abs])
+                process.start(proton_bin, ["run", exe_path_abs])
+            else:
+                output_window.append_output("=== Starting Wine Process ===", "#0066cc")
+                output_window.append_output(f"Command: wine {exe_path_abs}")
+                output_window.append_output("")
+
+                process.start("wine", [exe_path_abs])
 
             if not process.waitForStarted(5000):
                 output_window.append_output(
