@@ -65,9 +65,7 @@ class GameOutputWindow(
 
         val topPanel = JPanel(BorderLayout())
         topPanel.add(verboseCheckbox, BorderLayout.WEST)
-
         contentPanel.add(topPanel, BorderLayout.NORTH)
-
         outputText.isEditable = false
         outputText.font = Font("Monospaced", Font.PLAIN, 9)
         outputText.lineWrap = false
