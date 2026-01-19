@@ -823,10 +823,9 @@ class LaunchOptionsDialog(
     }
 
     private fun loadExistingOptions() {
-        game.launchOptions?.forEach { (key, value) ->
+        game.launchOptions.forEach { (key, value) ->
             tableModel.addRow(arrayOf(key, value))
         } ?: run {
-            // Initialize empty map if null
             game.launchOptions = mutableMapOf()
         }
     }
