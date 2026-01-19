@@ -46,10 +46,21 @@ class GameOutputWindow(
     private val fullLogBuffer = mutableListOf<String>()
     private val displayBuffer = mutableListOf<String>()
     private var needsUIUpdate = false
+    private var updateTimer: javax.swing.Timer? = null
+
+    @Volatile
+    private var isClosing = false
 
     init {
         initUI()
         startUIUpdateTimer()
+
+        defaultCloseOperation = DISPOSE_ON_CLOSE
+        addWindowListener(object : java.awt.event.WindowAdapter() {
+            override fun windowClosing(e: java.awt.event.WindowEvent?) {
+                cleanup()
+            }
+        })
     }
 
     private fun initUI() {
@@ -97,7 +108,10 @@ class GameOutputWindow(
 
         val closeBtn = JButton("Close").apply {
             preferredSize = Dimension(100, 32)
-            addActionListener { dispose() }
+            addActionListener {
+                cleanup()
+                dispose()
+            }
         }
 
         buttonPanel.add(saveBtn)
@@ -109,14 +123,16 @@ class GameOutputWindow(
     }
 
     private fun startUIUpdateTimer() {
-        val timer = javax.swing.Timer(200) {
-            updateUI()
+        updateTimer = javax.swing.Timer(200) {
+            if (!isClosing) {
+                updateUI()
+            }
         }
-        timer.start()
+        updateTimer?.start()
     }
 
     private fun updateUI() {
-        if (!needsUIUpdate) return
+        if (!needsUIUpdate || isClosing) return
 
         synchronized(displayBuffer) {
             if (displayBuffer.isEmpty()) return
@@ -124,8 +140,10 @@ class GameOutputWindow(
             val text = displayBuffer.takeLast(maxDisplayLines).joinToString("\n")
 
             SwingUtilities.invokeLater {
-                outputText.text = text
-                outputText.caretPosition = outputText.text.length
+                if (!isClosing) {
+                    outputText.text = text
+                    outputText.caretPosition = outputText.text.length
+                }
             }
 
             needsUIUpdate = false
@@ -133,6 +151,8 @@ class GameOutputWindow(
     }
 
     fun appendOutput(text: String, color: String? = null) {
+        if (isClosing) return
+
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
         val logLine = "[$timestamp] $text"
 
@@ -166,6 +186,18 @@ class GameOutputWindow(
     fun disableAbortButton() {
         SwingUtilities.invokeLater {
             abortBtn.isEnabled = false
+        }
+    }
+
+    fun cleanup() {
+        isClosing = true
+        updateTimer?.stop()
+        updateTimer = null
+        synchronized(fullLogBuffer) {
+            fullLogBuffer.clear()
+        }
+        synchronized(displayBuffer) {
+            displayBuffer.clear()
         }
     }
 
@@ -768,7 +800,6 @@ class AddGameDialog(
 
         buttonPanel.add(okBtn)
         buttonPanel.add(cancelBtn)
-
         mainPanel.add(buttonPanel)
 
         contentPane = mainPanel
@@ -911,6 +942,10 @@ class GameLauncher : JFrame("Hydra") {
     private val outputWindows = mutableMapOf<String, GameOutputWindow>()
     private val gamesContainer = JPanel()
     private val statusLabel = JLabel("Ready")
+    private val logReaderThreads = mutableListOf<Thread>()
+
+    @Volatile
+    private var isShuttingDown = false
 
     private val gson = Gson()
 
@@ -918,11 +953,21 @@ class GameLauncher : JFrame("Hydra") {
         initUI()
         loadGames()
         scanPrefixes()
+
+        Runtime.getRuntime().addShutdownHook(Thread {
+            cleanup()
+        })
     }
 
     private fun initUI() {
         minimumSize = Dimension(800, 600)
-        defaultCloseOperation = EXIT_ON_CLOSE
+        defaultCloseOperation = DO_NOTHING_ON_CLOSE
+
+        addWindowListener(object : java.awt.event.WindowAdapter() {
+            override fun windowClosing(e: java.awt.event.WindowEvent?) {
+                handleApplicationClose()
+            }
+        })
 
         val mainPanel = JPanel(BorderLayout(10, 10))
         mainPanel.border = EmptyBorder(10, 10, 10, 10)
@@ -1270,7 +1315,6 @@ class GameLauncher : JFrame("Hydra") {
             val process = processBuilder.start()
             gameProcesses[gameName] = process
 
-            // Wait briefly to ensure process starts
             Thread.sleep(100)
 
             if (!process.isAlive) {
@@ -1289,84 +1333,108 @@ class GameLauncher : JFrame("Hydra") {
 
             statusLabel.text = "$gameName is running (PID: $pid)"
 
-            // Thread for reading stdout
-            Thread {
+            val stdoutThread = Thread {
                 try {
                     process.inputStream.bufferedReader().use { reader ->
-                        reader.lineSequence().forEach { line ->
+                        while (!isShuttingDown && process.isAlive) {
+                            val line = reader.readLine() ?: break
                             if (line.isNotBlank()) {
                                 SwingUtilities.invokeLater {
-                                    outputWindow.appendOutput("[OUT] ${line.trim()}")
-                                }
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    SwingUtilities.invokeLater {
-                        outputWindow.appendOutput("[ERROR reading stdout: ${e.message}]", "#cc0000")
-                    }
-                }
-            }.start()
-
-            // Thread for reading stderr with color coding
-            Thread {
-                try {
-                    process.errorStream.bufferedReader().use { reader ->
-                        reader.lineSequence().forEach { line ->
-                            if (line.isNotBlank()) {
-                                SwingUtilities.invokeLater {
-                                    val trimmed = line.trim()
-                                    when {
-                                        "err:" in trimmed.lowercase() || "error" in trimmed.lowercase() ->
-                                            outputWindow.appendOutput("[ERR] $trimmed", "#cc0000")
-
-                                        "warn:" in trimmed.lowercase() || "warning" in trimmed.lowercase() ->
-                                            outputWindow.appendOutput("[WARN] $trimmed", "#cc6600")
-
-                                        "fixme:" in trimmed.lowercase() -> {
-                                            if (outputWindow.isVerboseMode()) {
-                                                outputWindow.appendOutput("[FIXME] $trimmed", "#666666")
-                                            }
-                                        }
-
-                                        else -> outputWindow.appendOutput("[ERR] $trimmed")
+                                    if (!isShuttingDown) {
+                                        outputWindow.appendOutput("[OUT] ${line.trim()}")
                                     }
                                 }
                             }
                         }
                     }
                 } catch (e: Exception) {
-                    SwingUtilities.invokeLater {
-                        outputWindow.appendOutput("[ERROR reading stderr: ${e.message}]", "#cc0000")
+                    if (!isShuttingDown) {
+                        SwingUtilities.invokeLater {
+                            outputWindow.appendOutput("[ERROR reading stdout: ${e.message}]", "#cc0000")
+                        }
                     }
                 }
-            }.start()
+            }.apply {
+                isDaemon = true
+                name = "stdout-reader-$gameName"
+            }
+            stdoutThread.start()
+            logReaderThreads.add(stdoutThread)
 
-            // Thread for monitoring process completion
-            Thread {
+            val stderrThread = Thread {
+                try {
+                    process.errorStream.bufferedReader().use { reader ->
+                        while (!isShuttingDown && process.isAlive) {
+                            val line = reader.readLine() ?: break
+                            if (line.isNotBlank()) {
+                                SwingUtilities.invokeLater {
+                                    if (!isShuttingDown) {
+                                        val trimmed = line.trim()
+                                        when {
+                                            "err:" in trimmed.lowercase() || "error" in trimmed.lowercase() ->
+                                                outputWindow.appendOutput("[ERR] $trimmed", "#cc0000")
+
+                                            "warn:" in trimmed.lowercase() || "warning" in trimmed.lowercase() ->
+                                                outputWindow.appendOutput("[WARN] $trimmed", "#cc6600")
+
+                                            "fixme:" in trimmed.lowercase() -> {
+                                                if (outputWindow.isVerboseMode()) {
+                                                    outputWindow.appendOutput("[FIXME] $trimmed", "#666666")
+                                                }
+                                            }
+
+                                            else -> outputWindow.appendOutput("[ERR] $trimmed")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    if (!isShuttingDown) {
+                        SwingUtilities.invokeLater {
+                            outputWindow.appendOutput("[ERROR reading stderr: ${e.message}]", "#cc0000")
+                        }
+                    }
+                }
+            }.apply {
+                isDaemon = true
+                name = "stderr-reader-$gameName"
+            }
+            stderrThread.start()
+            logReaderThreads.add(stderrThread)
+            val monitorThread = Thread {
                 val exitCode = process.waitFor()
 
-                SwingUtilities.invokeLater {
-                    outputWindow.appendOutput("")
-                    outputWindow.appendOutput("═".repeat(60), "#0066cc")
-                    outputWindow.appendOutput("PROCESS FINISHED", "#0066cc")
-                    outputWindow.appendOutput("═".repeat(60), "#0066cc")
+                if (!isShuttingDown) {
+                    SwingUtilities.invokeLater {
+                        outputWindow.appendOutput("")
+                        outputWindow.appendOutput("═".repeat(60), "#0066cc")
+                        outputWindow.appendOutput("PROCESS FINISHED", "#0066cc")
+                        outputWindow.appendOutput("═".repeat(60), "#0066cc")
 
-                    val color = if (exitCode == 0) "#008800" else "#cc0000"
-                    outputWindow.appendOutput("Exit Code: $exitCode", color)
+                        val color = if (exitCode == 0) "#008800" else "#cc0000"
+                        outputWindow.appendOutput("Exit Code: $exitCode", color)
 
-                    if (exitCode != 0) {
-                        outputWindow.appendOutput(
-                            "Non-zero exit code indicates the game may have crashed or encountered an error.",
-                            "#cc6600"
-                        )
+                        if (exitCode != 0) {
+                            outputWindow.appendOutput(
+                                "Non-zero exit code indicates the game may have crashed or encountered an error.",
+                                "#cc6600"
+                            )
+                        }
+
+                        outputWindow.disableAbortButton()
+                        gameProcesses.remove(gameName)
+                        logReaderThreads.removeAll { !it.isAlive }
+                        statusLabel.text = "$gameName exited (code: $exitCode)"
                     }
-
-                    outputWindow.disableAbortButton()
-                    gameProcesses.remove(gameName)
-                    statusLabel.text = "$gameName exited (code: $exitCode)"
                 }
-            }.start()
+            }.apply {
+                isDaemon = true
+                name = "process-monitor-$gameName"
+            }
+            monitorThread.start()
+            logReaderThreads.add(monitorThread)
 
         } catch (e: Exception) {
             outputWindow.appendOutput("", "#cc0000")
@@ -1419,6 +1487,7 @@ class GameLauncher : JFrame("Hydra") {
                 outputWindow?.disableAbortButton()
 
                 gameProcesses.remove(gameName)
+                logReaderThreads.removeAll { !it.isAlive }
                 statusLabel.text = "Aborted launch of $gameName"
             }
         } else {
@@ -1429,6 +1498,66 @@ class GameLauncher : JFrame("Hydra") {
                 JOptionPane.INFORMATION_MESSAGE
             )
         }
+    }
+
+    private fun handleApplicationClose() {
+        if (gameProcesses.isNotEmpty()) {
+            val result = JOptionPane.showConfirmDialog(
+                this,
+                "There are ${gameProcesses.size} game(s) still running.\nDo you want to terminate them and exit?",
+                "Confirm Exit",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+            )
+
+            if (result != JOptionPane.YES_OPTION) {
+                return
+            }
+        }
+
+        cleanup()
+        dispose()
+        System.exit(0)
+    }
+
+    private fun cleanup() {
+        isShuttingDown = true
+
+        outputWindows.values.forEach { window ->
+            try {
+                window.cleanup()
+                window.dispose()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        outputWindows.clear()
+
+        gameProcesses.values.forEach { process ->
+            try {
+                if (process.isAlive) {
+                    process.destroy()
+                    Thread.sleep(500)
+                    if (process.isAlive) {
+                        process.destroyForcibly()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        gameProcesses.clear()
+
+        logReaderThreads.forEach { thread ->
+            try {
+                if (thread.isAlive) {
+                    thread.interrupt()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        logReaderThreads.clear()
     }
 }
 
