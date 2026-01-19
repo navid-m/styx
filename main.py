@@ -44,7 +44,6 @@ class GameOutputWindow(QMainWindow):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
-        # Title
         title_label = QLabel(f"Output for: {self.game_name}")
         title_font = QFont()
         title_font.setPointSize(12)
@@ -52,13 +51,11 @@ class GameOutputWindow(QMainWindow):
         title_label.setFont(title_font)
         layout.addWidget(title_label)
 
-        # Output text area
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
         self.output_text.setFont(QFont("Monospace", 9))
         layout.addWidget(self.output_text)
 
-        # Button layout
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
@@ -79,7 +76,6 @@ class GameOutputWindow(QMainWindow):
     def append_output(self, text: str):
         """Append text to the output window"""
         self.output_text.append(text)
-        # Auto-scroll to bottom
         cursor = self.output_text.textCursor()
         cursor.movePosition(cursor.End)
         self.output_text.setTextCursor(cursor)
@@ -101,8 +97,35 @@ class PrefixScanner(QThread):
     def scan_wine_prefixes(self) -> List[Dict[str, str]]:
         """Scan for Steam Library directories and find Proton prefixes"""
         prefixes = []
+        seen_paths = set()
 
-        mount_points = ["/"]
+        home = Path.home()
+        common_locations = [
+            home / ".steam" / "steam" / "steamapps" / "compatdata",
+            home / ".local" / "share" / "Steam" / "steamapps" / "compatdata",
+            Path("/") / "usr" / "share" / "Steam" / "steamapps" / "compatdata",
+        ]
+
+        for compatdata_path in common_locations:
+            if compatdata_path.exists():
+                try:
+                    for prefix_dir in compatdata_path.iterdir():
+                        if prefix_dir.is_dir():
+                            pfx_path = prefix_dir / "pfx"
+                            if pfx_path.exists():
+                                pfx_path_str = str(pfx_path)
+                                if pfx_path_str not in seen_paths:
+                                    seen_paths.add(pfx_path_str)
+                                    prefixes.append(
+                                        {
+                                            "name": f"Proton - {prefix_dir.name}",
+                                            "path": pfx_path_str,
+                                        }
+                                    )
+                except (PermissionError, OSError):
+                    continue
+
+        mount_points = []
 
         try:
             if os.path.exists("/mnt"):
@@ -134,14 +157,40 @@ class PrefixScanner(QThread):
         except (PermissionError, OSError):
             pass
 
-        home = Path.home()
-        mount_points.append(str(home))
+        skip_dirs = {
+            "proc",
+            "sys",
+            "dev",
+            "run",
+            "tmp",
+            "snap",
+            "var",
+            "boot",
+            "srv",
+            "lost+found",
+            ".cache",
+            ".local/share/Trash",
+            "node_modules",
+            ".git",
+            ".svn",
+            "__pycache__",
+            "venv",
+            "virtualenv",
+            "site-packages",
+            "Windows",
+            "Program Files",
+            "Program Files (x86)",
+            "windows",
+            "dosdevices",
+            "drive_c",
+        }
 
         for mount in mount_points:
             try:
                 for root, dirs, files in os.walk(mount, followlinks=False):
                     depth = root[len(mount) :].count(os.sep)
-                    if depth > 5:
+
+                    if depth > 3:
                         dirs[:] = []
                         continue
 
@@ -150,22 +199,27 @@ class PrefixScanner(QThread):
                         compatdata_path = steamapps_path / "compatdata"
 
                         if compatdata_path.exists():
-                            for prefix_dir in compatdata_path.iterdir():
-                                if prefix_dir.is_dir():
-                                    pfx_path = prefix_dir / "pfx"
-                                    if pfx_path.exists():
-                                        prefixes.append(
-                                            {
-                                                "name": f"Proton - {prefix_dir.name}",
-                                                "path": str(pfx_path),
-                                            }
-                                        )
+                            try:
+                                for prefix_dir in compatdata_path.iterdir():
+                                    if prefix_dir.is_dir():
+                                        pfx_path = prefix_dir / "pfx"
+                                        if pfx_path.exists():
+                                            pfx_path_str = str(pfx_path)
+                                            if pfx_path_str not in seen_paths:
+                                                seen_paths.add(pfx_path_str)
+                                                prefixes.append(
+                                                    {
+                                                        "name": f"Proton - {prefix_dir.name}",
+                                                        "path": pfx_path_str,
+                                                    }
+                                                )
+                            except (PermissionError, OSError):
+                                pass
 
-                    # Don't recurse into certain directories
+                        dirs.remove("steamapps")
+
                     dirs[:] = [
-                        d
-                        for d in dirs
-                        if d not in ["proc", "sys", "dev", "run", "tmp", "snap"]
+                        d for d in dirs if d not in skip_dirs and not d.startswith(".")
                     ]
 
             except (PermissionError, OSError):
@@ -191,7 +245,6 @@ class AddGameDialog(QDialog):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
-        # Game name
         name_layout = QHBoxLayout()
         name_label = QLabel("Game Name:")
         name_label.setMinimumWidth(100)
@@ -200,7 +253,6 @@ class AddGameDialog(QDialog):
         name_layout.addWidget(self.name_input)
         layout.addLayout(name_layout)
 
-        # Executable
         exe_layout = QHBoxLayout()
         exe_label = QLabel("Executable:")
         exe_label.setMinimumWidth(100)
@@ -214,7 +266,6 @@ class AddGameDialog(QDialog):
         exe_layout.addWidget(browse_btn)
         layout.addLayout(exe_layout)
 
-        # Wine prefix
         prefix_layout = QHBoxLayout()
         prefix_label = QLabel("Wine Prefix:")
         prefix_label.setMinimumWidth(100)
@@ -230,7 +281,6 @@ class AddGameDialog(QDialog):
         prefix_layout.addWidget(browse_prefix_btn)
         layout.addLayout(prefix_layout)
 
-        # Button layout
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
@@ -311,14 +361,12 @@ class GameLauncher(QMainWindow):
         self.setWindowTitle("Hydra - Wine/Proton Game Launcher")
         self.setMinimumSize(800, 600)
 
-        # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
 
-        # Title
         title_label = QLabel("Game Library")
         title_font = QFont()
         title_font.setPointSize(14)
@@ -326,7 +374,6 @@ class GameLauncher(QMainWindow):
         title_label.setFont(title_font)
         main_layout.addWidget(title_label)
 
-        # Games list
         list_group = QGroupBox("Games")
         list_layout = QVBoxLayout()
         list_layout.setContentsMargins(5, 10, 5, 5)
@@ -336,7 +383,6 @@ class GameLauncher(QMainWindow):
         list_group.setLayout(list_layout)
         main_layout.addWidget(list_group)
 
-        # Buttons
         button_layout = QHBoxLayout()
         button_layout.setSpacing(8)
 
@@ -365,7 +411,6 @@ class GameLauncher(QMainWindow):
 
         main_layout.addLayout(button_layout)
 
-        # Status bar
         self.statusBar().showMessage("Ready")
 
     def scan_prefixes(self):
@@ -465,12 +510,10 @@ class GameLauncher(QMainWindow):
             QMessageBox.critical(self, "Error", f"Wine prefix not found: {prefix_path}")
             return
 
-        # Create output window
         output_window = GameOutputWindow(game_name, self)
         self.output_windows[game_name] = output_window
         output_window.show()
 
-        # Log initial information
         output_window.append_output(f"=== Launching {game_name} ===")
         output_window.append_output(f"Executable: {exe_path}")
         output_window.append_output(f"Wine Prefix: {prefix_path}")
@@ -478,24 +521,18 @@ class GameLauncher(QMainWindow):
         output_window.append_output("")
 
         try:
-            # Create QProcess for better control and output capture
             process = QProcess()
             self.game_processes[game_name] = process
 
-            # Set up environment
             env = QProcess.systemEnvironment()
             env.append(f"WINEPREFIX={prefix_path}")
-            # Disable Wine debug output to prevent hanging on configuration dialogs
             env.append("WINEDEBUG=-all")
-            # Disable Wine GUI dialogs
             env.append("WINEDLLOVERRIDES=winemenubuilder.exe=d")
             process.setEnvironment(env)
 
-            # Set working directory
             working_dir = str(Path(exe_path).parent)
             process.setWorkingDirectory(working_dir)
 
-            # Connect signals for output capture
             process.readyReadStandardOutput.connect(
                 lambda: self.handle_stdout(game_name)
             )
