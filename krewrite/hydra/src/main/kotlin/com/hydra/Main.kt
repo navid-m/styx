@@ -12,8 +12,6 @@ import javax.swing.border.LineBorder
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlin.io.path.*
-import com.formdev.flatlaf.FlatDarkLaf
-import com.formdev.flatlaf.FlatLightLaf
 import com.formdev.flatlaf.themes.FlatMacDarkLaf
 
 data class Game(
