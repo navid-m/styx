@@ -12,6 +12,9 @@ import javax.swing.border.LineBorder
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlin.io.path.*
+import com.formdev.flatlaf.FlatDarkLaf
+import com.formdev.flatlaf.FlatLightLaf
+import com.formdev.flatlaf.themes.FlatMacDarkLaf
 
 data class Game(
     val name: String,
@@ -31,7 +34,11 @@ data class PrefixInfo(
  * The game output window.
  * This is used for debug output from the game.
  */
-class GameOutputWindow(private val gameName: String, parent: JFrame? = null, private val onAbort: ((String) -> Unit)? = null) : JFrame("Game Output - $gameName") {
+class GameOutputWindow(
+    private val gameName: String,
+    parent: JFrame? = null,
+    private val onAbort: ((String) -> Unit)? = null
+) : JFrame("Game Output - $gameName") {
     private val outputText = JTextArea()
     private val verboseCheckbox = JCheckBox("Verbose Mode (show all Wine debug)", false)
     private val abortBtn = JButton("Abort Launch")
@@ -74,7 +81,7 @@ class GameOutputWindow(private val gameName: String, parent: JFrame? = null, pri
             background = Color(0xCC, 0x00, 0x00)
             foreground = Color.WHITE
             font = font.deriveFont(Font.BOLD)
-            addActionListener { 
+            addActionListener {
                 onAbort?.invoke(gameName)
             }
         }
@@ -112,17 +119,17 @@ class GameOutputWindow(private val gameName: String, parent: JFrame? = null, pri
 
     private fun updateUI() {
         if (!needsUIUpdate) return
-        
+
         synchronized(displayBuffer) {
             if (displayBuffer.isEmpty()) return
-            
+
             val text = displayBuffer.takeLast(maxDisplayLines).joinToString("\n")
-            
+
             SwingUtilities.invokeLater {
                 outputText.text = text
                 outputText.caretPosition = outputText.text.length
             }
-            
+
             needsUIUpdate = false
         }
     }
@@ -130,11 +137,11 @@ class GameOutputWindow(private val gameName: String, parent: JFrame? = null, pri
     fun appendOutput(text: String, color: String? = null) {
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
         val logLine = "[$timestamp] $text"
-        
+
         synchronized(fullLogBuffer) {
             fullLogBuffer.add(logLine)
         }
-        
+
         synchronized(displayBuffer) {
             displayBuffer.add(logLine)
             if (displayBuffer.size > maxDisplayLines * 2) {
@@ -331,7 +338,7 @@ class PrefixScanner : SwingWorker<List<PrefixInfo>, Void>() {
             val entries = path.listDirectoryEntries()
             var skippedCount = 0
             var scannedCount = 0
-            
+
             for (entry in entries) {
                 val fileName = entry.fileName.toString()
                 if (entry.isDirectory()) {
@@ -343,7 +350,7 @@ class PrefixScanner : SwingWorker<List<PrefixInfo>, Void>() {
                     }
                 }
             }
-            
+
         } catch (e: Exception) {
             println("[SCAN] Error at $path: ${e.message}")
         }
@@ -872,8 +879,8 @@ class GameItemWidget(
         add(Box.createHorizontalGlue())
 
         val pmwBtn = JButton("PMW").apply {
-            preferredSize = Dimension(60, 28)
-            maximumSize = Dimension(60, 28)
+            preferredSize = Dimension(90, 28)
+            maximumSize = Dimension(90, 28)
             toolTipText = "Proton Manager Window"
             addActionListener { onProtonManager(game) }
         }
@@ -889,8 +896,8 @@ class GameItemWidget(
         add(Box.createHorizontalStrut(5))
 
         val launchBtn = JButton("Launch").apply {
-            preferredSize = Dimension(80, 28)
-            maximumSize = Dimension(80, 28)
+            preferredSize = Dimension(100, 28)
+            maximumSize = Dimension(100, 28)
             font = font.deriveFont(Font.BOLD)
             addActionListener { onLaunch(game) }
         }
@@ -1195,7 +1202,7 @@ class GameLauncher : JFrame("Hydra") {
         outputWindow.appendOutput("Executable: $exePath")
         outputWindow.appendOutput("Working Directory: ${File(exePath).parent}")
         outputWindow.appendOutput("Wine Prefix: $prefixPath")
-        
+
         val useProton = game.protonBin != null
         if (useProton) {
             val protonVersion = game.protonVersion ?: "Unknown"
@@ -1239,23 +1246,24 @@ class GameLauncher : JFrame("Hydra") {
 
             outputWindow.appendOutput("")
             outputWindow.appendOutput("=== Environment Variables ===", "#0066cc")
-            env.filter { it.key.startsWith("WINE") || it.key == "DISPLAY" || it.key.startsWith("STEAM_COMPAT") }.forEach { (key, value) ->
-                outputWindow.appendOutput("  $key=$value")
-            }
+            env.filter { it.key.startsWith("WINE") || it.key == "DISPLAY" || it.key.startsWith("STEAM_COMPAT") }
+                .forEach { (key, value) ->
+                    outputWindow.appendOutput("  $key=$value")
+                }
             outputWindow.appendOutput("")
 
             processBuilder.directory(File(exePath).parentFile)
-            
+
             if (useProton) {
                 val protonBin = game.protonBin!!
                 processBuilder.command(protonBin, "run", File(exePath).absolutePath)
-                
+
                 outputWindow.appendOutput("=== Starting Proton Process ===", "#0066cc")
                 outputWindow.appendOutput("Command: $protonBin run ${File(exePath).absolutePath}")
                 outputWindow.appendOutput("")
             } else {
                 processBuilder.command("wine", File(exePath).absolutePath)
-                
+
                 outputWindow.appendOutput("=== Starting Wine Process ===", "#0066cc")
                 outputWindow.appendOutput("Command: wine ${File(exePath).absolutePath}")
                 outputWindow.appendOutput("")
@@ -1426,14 +1434,10 @@ class GameLauncher : JFrame("Hydra") {
     }
 }
 
-fun main(args: Array<String>) {
-    SwingUtilities.invokeLater {
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName())
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
 
+fun main(args: Array<String>) {
+    FlatMacDarkLaf.setup()
+    SwingUtilities.invokeLater {
         val launcher = GameLauncher()
         launcher.isVisible = true
     }
