@@ -278,19 +278,15 @@ class AddGameDialog(QDialog):
         prefix_path = self.prefix_combo.currentData()
 
         if not name:
-            QMessageBox.warning(self, "Invalid Input", "Please enter a game name.")
+            QMessageBox.warning(self, "Invalid Input", "Enter a game name.")
             return
 
         if not exe_path or not os.path.exists(exe_path):
-            QMessageBox.warning(
-                self, "Invalid Input", "Please select a valid executable."
-            )
+            QMessageBox.warning(self, "Invalid Input", "Select a valid executable.")
             return
 
         if not prefix_path or not os.path.exists(prefix_path):
-            QMessageBox.warning(
-                self, "Invalid Input", "Please select a valid Wine prefix."
-            )
+            QMessageBox.warning(self, "Invalid Input", "Select a valid Wine prefix.")
             return
 
         self.game_data = {"name": name, "executable": exe_path, "prefix": prefix_path}
