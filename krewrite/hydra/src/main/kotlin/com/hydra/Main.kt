@@ -1119,6 +1119,98 @@ class GameItemWidget(
             addActionListener { onLaunch(game) }
         }
         add(launchBtn)
+
+        setupContextMenu()
+    }
+
+    private fun setupContextMenu() {
+        val popupMenu = JPopupMenu()
+
+        val openGameLocationItem = JMenuItem("Open game location").apply {
+            addActionListener {
+                openGameLocation()
+            }
+        }
+
+        val openPrefixLocationItem = JMenuItem("Open wine prefix location").apply {
+            addActionListener {
+                openPrefixLocation()
+            }
+        }
+
+        popupMenu.add(openGameLocationItem)
+        popupMenu.add(openPrefixLocationItem)
+
+        addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) {
+                if (e.isPopupTrigger) {
+                    popupMenu.show(e.component, e.x, e.y)
+                }
+            }
+
+            override fun mouseReleased(e: java.awt.event.MouseEvent) {
+                if (e.isPopupTrigger) {
+                    popupMenu.show(e.component, e.x, e.y)
+                }
+            }
+        })
+    }
+
+    private fun openGameLocation() {
+        val gameFile = File(game.executable)
+        val gameDirectory = gameFile.parentFile
+
+        if (gameDirectory != null && gameDirectory.exists()) {
+            try {
+                if (Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().open(gameDirectory)
+                } else {
+                    ProcessBuilder("xdg-open", gameDirectory.absolutePath).start()
+                }
+            } catch (e: Exception) {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to open game location: ${e.message}",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+                )
+            }
+        } else {
+            JOptionPane.showMessageDialog(
+                this,
+                "Game location not found: ${gameDirectory?.absolutePath ?: game.executable}",
+                "Error",
+                JOptionPane.ERROR_MESSAGE
+            )
+        }
+    }
+
+    private fun openPrefixLocation() {
+        val prefixDirectory = File(game.prefix)
+
+        if (prefixDirectory.exists()) {
+            try {
+                if (Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().open(prefixDirectory)
+                } else {
+                    ProcessBuilder("xdg-open", prefixDirectory.absolutePath).start()
+                }
+            } catch (e: Exception) {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to open wine prefix location: ${e.message}",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+                )
+            }
+        } else {
+            JOptionPane.showMessageDialog(
+                this,
+                "Wine prefix not found: ${game.prefix}",
+                "Error",
+                JOptionPane.ERROR_MESSAGE
+            )
+        }
     }
 }
 
@@ -1264,7 +1356,14 @@ class GameLauncher : JFrame("Hydra") {
 
         games.forEach { game ->
             val gameWidget =
-                GameItemWidget(game, ::launchGame, ::changeGamePrefix, ::openProtonManager, ::openPrefixManager, ::openLaunchOptions)
+                GameItemWidget(
+                    game,
+                    ::launchGame,
+                    ::changeGamePrefix,
+                    ::openProtonManager,
+                    ::openPrefixManager,
+                    ::openLaunchOptions
+                )
             gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 60)
             gamesContainer.add(gameWidget)
             gamesContainer.add(Box.createVerticalStrut(5))
@@ -1436,7 +1535,7 @@ class GameLauncher : JFrame("Hydra") {
         if (game.launchOptions == null) {
             game.launchOptions = mutableMapOf()
         }
-        
+
         val dialog = LaunchOptionsDialog(game, this)
         dialog.isVisible = true
 
@@ -1576,19 +1675,22 @@ class GameLauncher : JFrame("Hydra") {
 
             outputWindow.appendOutput("")
             outputWindow.appendOutput("=== Environment Variables ===", "#0066cc")
-            env.filter { 
-                it.key.startsWith("WINE") || 
-                it.key == "DISPLAY" || 
-                it.key.startsWith("STEAM_COMPAT") ||
-                it.key.startsWith("DXVK") ||
-                it.key.startsWith("PROTON") ||
-                it.key == "MANGOHUD" ||
-                (game.launchOptions.containsKey(it.key) == true)
+            env.filter {
+                it.key.startsWith("WINE") ||
+                        it.key == "DISPLAY" ||
+                        it.key.startsWith("STEAM_COMPAT") ||
+                        it.key.startsWith("DXVK") ||
+                        it.key.startsWith("PROTON") ||
+                        it.key == "MANGOHUD" ||
+                        (game.launchOptions.containsKey(it.key) == true)
             }.forEach { (key, value) ->
                 outputWindow.appendOutput("  $key=$value")
             }
             if (game.launchOptions.isNotEmpty() == true) {
-                outputWindow.appendOutput("Custom launch options: ${game.launchOptions.size ?: 0} variable(s)", "#00aa00")
+                outputWindow.appendOutput(
+                    "Custom launch options: ${game.launchOptions.size ?: 0} variable(s)",
+                    "#00aa00"
+                )
             }
             outputWindow.appendOutput("")
 
