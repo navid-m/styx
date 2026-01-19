@@ -143,6 +143,9 @@ class PrefixScanner : SwingWorker<List<PrefixInfo>, Void>() {
         val prefixes = mutableListOf<PrefixInfo>()
         val seenPaths = mutableSetOf<String>()
 
+        println("[SCAN] Starting Wine prefix scan...")
+        val startTime = System.currentTimeMillis()
+
         val home = Paths.get(System.getProperty("user.home"))
         val commonLocations = listOf(
             home.resolve(".steam/steam/steamapps/compatdata"),
@@ -150,8 +153,10 @@ class PrefixScanner : SwingWorker<List<PrefixInfo>, Void>() {
             Paths.get("/usr/share/Steam/steamapps/compatdata")
         )
 
+        println("[SCAN] Checking common Steam locations...")
         for (compatdataPath in commonLocations) {
             if (compatdataPath.exists()) {
+                println("[SCAN] Found: $compatdataPath")
                 try {
                     compatdataPath.listDirectoryEntries().forEach { prefixDir ->
                         if (prefixDir.isDirectory()) {
@@ -161,51 +166,59 @@ class PrefixScanner : SwingWorker<List<PrefixInfo>, Void>() {
                                 if (pfxPathStr !in seenPaths) {
                                     seenPaths.add(pfxPathStr)
                                     prefixes.add(PrefixInfo("Proton - ${prefixDir.name}", pfxPathStr))
+                                    println("[SCAN] Added prefix: ${prefixDir.name}")
                                 }
                             }
                         }
                     }
                 } catch (e: Exception) {
-                    // Continue on permission/IO errors
+                    println("[SCAN] Error scanning $compatdataPath: ${e.message}")
                 }
             }
         }
+        println("[SCAN] Common locations done. Found ${prefixes.size} prefixes so far.")
 
         val mountPoints = mutableListOf<String>()
 
         try {
             val mntPath = Paths.get("/mnt")
             if (mntPath.exists()) {
+                println("[SCAN] Checking /mnt...")
                 mntPath.listDirectoryEntries().forEach { dir ->
                     if (dir.isDirectory()) {
                         mountPoints.add(dir.absolutePathString())
+                        println("[SCAN] Added mount point: ${dir.fileName}")
                     }
                 }
             }
         } catch (e: Exception) {
-            // Continue
+            println("[SCAN] Error scanning /mnt: ${e.message}")
         }
 
         try {
             val mediaPath = Paths.get("/media")
             if (mediaPath.exists()) {
+                println("[SCAN] Checking /media...")
                 mediaPath.listDirectoryEntries().forEach { userPath ->
                     try {
                         if (userPath.isDirectory()) {
                             userPath.listDirectoryEntries().forEach { dir ->
                                 if (dir.isDirectory()) {
                                     mountPoints.add(dir.absolutePathString())
+                                    println("[SCAN] Added mount point: ${dir.fileName}")
                                 }
                             }
                         }
                     } catch (e: Exception) {
-                        // Continue
+                        println("[SCAN] Error scanning ${userPath}: ${e.message}")
                     }
                 }
             }
         } catch (e: Exception) {
-            // Continue
+            println("[SCAN] Error scanning /media: ${e.message}")
         }
+
+        println("[SCAN] Found ${mountPoints.size} mount points to scan")
 
         val skipDirs = setOf(
             "proc", "sys", "dev", "run", "tmp", "snap", "var", "boot", "srv",
@@ -217,48 +230,89 @@ class PrefixScanner : SwingWorker<List<PrefixInfo>, Void>() {
 
         for (mount in mountPoints) {
             try {
-                Files.walk(Paths.get(mount), 4)
-                    .filter { path ->
-                        val fileName = path.fileName?.toString() ?: ""
-                        fileName !in skipDirs && !fileName.startsWith(".")
-                    }
-                    .use { stream ->
-                        stream.forEach { root ->
-                            try {
-                                val steamapps = root.resolve("steamapps")
-                                if (steamapps.exists() && steamapps.isDirectory()) {
-                                    val compatdata = steamapps.resolve("compatdata")
-                                    if (compatdata.exists()) {
-                                        compatdata.listDirectoryEntries().forEach { prefixDir ->
-                                            if (prefixDir.isDirectory()) {
-                                                val pfxPath = prefixDir.resolve("pfx")
-                                                if (pfxPath.exists()) {
-                                                    val pfxPathStr = pfxPath.absolutePathString()
-                                                    if (pfxPathStr !in seenPaths) {
-                                                        seenPaths.add(pfxPathStr)
-                                                        prefixes.add(
-                                                            PrefixInfo(
-                                                                "Proton - ${prefixDir.name}",
-                                                                pfxPathStr
-                                                            )
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                // Continue
-                            }
-                        }
-                    }
+                println("[SCAN] Scanning mount: $mount")
+                val mountStart = System.currentTimeMillis()
+                scanMountForPrefixes(Paths.get(mount), seenPaths, prefixes, skipDirs, 0, 1)
+                val mountTime = System.currentTimeMillis() - mountStart
+                println("[SCAN] Finished $mount in ${mountTime}ms")
             } catch (e: Exception) {
-                // Continue
+                println("[SCAN] Error scanning mount $mount: ${e.message}")
             }
         }
 
+        val totalTime = System.currentTimeMillis() - startTime
+        println("[SCAN] Total scan completed in ${totalTime}ms. Found ${prefixes.size} prefixes total.")
         return prefixes
+    }
+
+    private fun scanMountForPrefixes(
+        path: java.nio.file.Path,
+        seenPaths: MutableSet<String>,
+        prefixes: MutableList<PrefixInfo>,
+        skipDirs: Set<String>,
+        depth: Int,
+        maxDepth: Int
+    ) {
+        if (depth > maxDepth) {
+            println("[SCAN] Max depth reached at: $path")
+            return
+        }
+        if (!path.exists() || !path.isDirectory()) return
+
+        println("[SCAN] [Depth $depth] Scanning: $path")
+
+        try {
+            // Check if steamapps exists in this directory
+            val steamappsPath = path.resolve("steamapps")
+            if (steamappsPath.exists() && steamappsPath.isDirectory()) {
+                println("[SCAN] Found steamapps at: $path")
+                val compatdataPath = steamappsPath.resolve("compatdata")
+                if (compatdataPath.exists() && compatdataPath.isDirectory()) {
+                    try {
+                        compatdataPath.listDirectoryEntries().forEach { prefixDir ->
+                            if (prefixDir.isDirectory()) {
+                                val pfxPath = prefixDir.resolve("pfx")
+                                if (pfxPath.exists()) {
+                                    val pfxPathStr = pfxPath.absolutePathString()
+                                    if (pfxPathStr !in seenPaths) {
+                                        seenPaths.add(pfxPathStr)
+                                        prefixes.add(PrefixInfo("Proton - ${prefixDir.name}", pfxPathStr))
+                                        println("[SCAN] Added prefix from mount: ${prefixDir.name}")
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        println("[SCAN] Error processing compatdata: ${e.message}")
+                    }
+                }
+                // Don't descend into steamapps directory
+                return
+            }
+
+            // Recursively scan subdirectories, but skip directories in skipDirs
+            val entries = path.listDirectoryEntries()
+            var skippedCount = 0
+            var scannedCount = 0
+            
+            for (entry in entries) {
+                val fileName = entry.fileName.toString()
+                if (entry.isDirectory()) {
+                    if (fileName in skipDirs || fileName.startsWith(".")) {
+                        skippedCount++
+                    } else {
+                        scannedCount++
+                        scanMountForPrefixes(entry, seenPaths, prefixes, skipDirs, depth + 1, maxDepth)
+                    }
+                }
+            }
+            
+            if (skippedCount > 0 || scannedCount > 0) {
+                println("[SCAN] [Depth $depth] $path: scanned $scannedCount dirs, skipped $skippedCount dirs")
+            }
+        } catch (e: Exception) {
+            println("[SCAN] Error at $path: ${e.message}")
+        }
     }
 }
 
