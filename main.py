@@ -4,6 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 from typing import List, Dict, Optional
+from datetime import datetime
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -23,9 +24,10 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QScrollArea,
     QFrame,
+    QCheckBox,
 )
-from PySide6.QtCore import Qt, QThread, Signal, QProcess
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, QThread, Signal, QProcess, QTimer
+from PySide6.QtGui import QFont, QColor, QTextCursor
 
 
 class GameOutputWindow(QMainWindow):
@@ -38,7 +40,7 @@ class GameOutputWindow(QMainWindow):
 
     def init_ui(self):
         self.setWindowTitle(f"Game Output - {self.game_name}")
-        self.setMinimumSize(700, 500)
+        self.setMinimumSize(800, 600)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -53,6 +55,10 @@ class GameOutputWindow(QMainWindow):
         title_label.setFont(title_font)
         layout.addWidget(title_label)
 
+        self.verbose_checkbox = QCheckBox("Verbose Mode (show all Wine debug)")
+        self.verbose_checkbox.setChecked(False)
+        layout.addWidget(self.verbose_checkbox)
+
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
         self.output_text.setFont(QFont("Monospace", 9))
@@ -60,6 +66,12 @@ class GameOutputWindow(QMainWindow):
 
         button_layout = QHBoxLayout()
         button_layout.addStretch()
+
+        save_btn = QPushButton("Save Log")
+        save_btn.setMinimumHeight(32)
+        save_btn.setMinimumWidth(100)
+        save_btn.clicked.connect(self.save_log)
+        button_layout.addWidget(save_btn)
 
         clear_btn = QPushButton("Clear Output")
         clear_btn.setMinimumHeight(32)
@@ -75,16 +87,41 @@ class GameOutputWindow(QMainWindow):
 
         layout.addLayout(button_layout)
 
-    def append_output(self, text: str):
-        """Append text to the output window"""
-        self.output_text.append(text)
+    def append_output(self, text: str, color: Optional[str] = None):
+        """Append text to the output window with optional color"""
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+
+        if color:
+            formatted_text = (
+                f'<span style="color: {color};">[{timestamp}] {text}</span>'
+            )
+            self.output_text.append(formatted_text)
+        else:
+            self.output_text.append(f"[{timestamp}] {text}")
+
         cursor = self.output_text.textCursor()
-        cursor.movePosition(cursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         self.output_text.setTextCursor(cursor)
 
     def clear_output(self):
         """Clear all output"""
         self.output_text.clear()
+
+    def save_log(self):
+        """Save the output log to a file"""
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Log File",
+            f"{self.game_name}_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            "Text Files (*.txt);;All Files (*)",
+        )
+        if file_path:
+            try:
+                with open(file_path, "w") as f:
+                    f.write(self.output_text.toPlainText())
+                QMessageBox.information(self, "Success", f"Log saved to {file_path}")
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Failed to save log: {str(e)}")
 
 
 class PrefixScanner(QThread):
@@ -529,6 +566,7 @@ class GameLauncher(QMainWindow):
         self.config_file = Path.home() / ".config" / "hydra" / "games.json"
         self.game_processes: Dict[str, QProcess] = {}
         self.output_windows: Dict[str, GameOutputWindow] = {}
+        self.process_timers: Dict[str, QTimer] = {}
         self.init_ui()
         self.load_games()
         self.scan_prefixes()
@@ -697,6 +735,46 @@ class GameLauncher(QMainWindow):
                     )
                     break
 
+    def check_wine_availability(self, output_window: GameOutputWindow):
+        """Check if Wine is available and log version info"""
+        try:
+            output_window.append_output("=== Pre-flight checks ===", "#0066cc")
+
+            result = subprocess.run(["which", "wine"], capture_output=True, text=True)
+            if result.returncode == 0:
+                wine_path = result.stdout.strip()
+                output_window.append_output(f"Wine found at: {wine_path}", "#008800")
+            else:
+                output_window.append_output(
+                    "WARNING: 'wine' command not found in PATH", "#cc6600"
+                )
+                return False
+
+            result = subprocess.run(
+                ["wine", "--version"], capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                version = result.stdout.strip()
+                output_window.append_output(f"Wine version: {version}", "#008800")
+            else:
+                output_window.append_output(
+                    f"Could not get Wine version: {result.stderr.strip()}", "#cc6600"
+                )
+
+            output_window.append_output("")
+            return True
+
+        except subprocess.TimeoutExpired:
+            output_window.append_output(
+                "WARNING: Wine version check timed out", "#cc6600"
+            )
+            output_window.append_output("")
+            return True
+        except Exception as e:
+            output_window.append_output(f"ERROR checking Wine: {str(e)}", "#cc0000")
+            output_window.append_output("")
+            return False
+
     def launch_game(self, game: Dict[str, str]):
         """Launch a game using Wine with the specified prefix"""
         exe_path = game["executable"]
@@ -715,10 +793,32 @@ class GameLauncher(QMainWindow):
         self.output_windows[game_name] = output_window
         output_window.show()
 
-        output_window.append_output(f"=== Launching {game_name} ===")
+        output_window.append_output("═" * 60, "#0066cc")
+        output_window.append_output(f"LAUNCHING: {game_name}", "#0066cc")
+        output_window.append_output("═" * 60, "#0066cc")
+        output_window.append_output("")
+
+        if not self.check_wine_availability(output_window):
+            output_window.append_output(
+                "Pre-flight checks failed. Aborting launch.", "#cc0000"
+            )
+            return
+
+        output_window.append_output("=== Launch Configuration ===", "#0066cc")
         output_window.append_output(f"Executable: {exe_path}")
-        output_window.append_output(f"Wine Prefix: {prefix_path}")
         output_window.append_output(f"Working Directory: {Path(exe_path).parent}")
+        output_window.append_output(f"Wine Prefix: {prefix_path}")
+
+        if os.path.exists(prefix_path):
+            system_reg = Path(prefix_path) / "system.reg"
+            user_reg = Path(prefix_path) / "user.reg"
+            if system_reg.exists() and user_reg.exists():
+                output_window.append_output("Wine prefix validation: OK", "#008800")
+            else:
+                output_window.append_output(
+                    "WARNING: Wine prefix may be incomplete or corrupted", "#cc6600"
+                )
+
         output_window.append_output("")
 
         try:
@@ -727,18 +827,40 @@ class GameLauncher(QMainWindow):
 
             env = QProcess.systemEnvironment()
             env.append(f"WINEPREFIX={prefix_path}")
-            env.append("WINEDEBUG=-all")
+
+            if output_window.verbose_checkbox.isChecked():
+                env.append("WINEDEBUG=+all")
+                output_window.append_output(
+                    "Verbose mode enabled: WINEDEBUG=+all", "#0066cc"
+                )
+            else:
+                env.append("WINEDEBUG=warn+all,fixme-all")
+                output_window.append_output(
+                    "Debug mode: WINEDEBUG=warn+all,fixme-all", "#0066cc"
+                )
+
             env.append("WINEDLLOVERRIDES=winemenubuilder.exe=d")
+            env.append("DISPLAY=:0")
+
+            output_window.append_output("")
+            output_window.append_output("=== Environment Variables ===", "#0066cc")
+            for var in env:
+                if any(var.startswith(prefix) for prefix in ["WINE", "DISPLAY"]):
+                    output_window.append_output(f"  {var}")
+            output_window.append_output("")
+
             process.setEnvironment(env)
 
             working_dir = str(Path(exe_path).parent)
             process.setWorkingDirectory(working_dir)
 
+            process.setProcessChannelMode(QProcess.MergedChannels)
+
             process.readyReadStandardOutput.connect(
-                lambda: self.handle_stdout(game_name)
+                lambda: self.handle_output(game_name)
             )
             process.readyReadStandardError.connect(
-                lambda: self.handle_stderr(game_name)
+                lambda: self.handle_output(game_name)
             )
             process.started.connect(lambda: self.handle_started(game_name))
             process.finished.connect(
@@ -749,40 +871,138 @@ class GameLauncher(QMainWindow):
             process.errorOccurred.connect(
                 lambda error: self.handle_error(game_name, error)
             )
+            process.stateChanged.connect(
+                lambda state: self.handle_state_changed(game_name, state)
+            )
+
+            timer = QTimer()
+            timer.timeout.connect(lambda: self.check_process_status(game_name))
+            timer.start(2000)
+            self.process_timers[game_name] = timer
 
             exe_path_abs = os.path.abspath(exe_path)
+
+            output_window.append_output("=== Starting Wine Process ===", "#0066cc")
+            output_window.append_output(f"Command: wine {exe_path_abs}")
+            output_window.append_output("")
+
             process.start("wine", [exe_path_abs])
 
+            if not process.waitForStarted(5000):
+                output_window.append_output(
+                    "ERROR: Process failed to start within 5 seconds", "#cc0000"
+                )
+                output_window.append_output(
+                    f"Process state: {process.state()}", "#cc0000"
+                )
+                output_window.append_output(
+                    f"Process error: {process.errorString()}", "#cc0000"
+                )
+
             self.statusBar().showMessage(f"Launching {game_name}...")
-            output_window.append_output("Starting Wine process...")
 
         except Exception as e:
-            output_window.append_output(f"ERROR: {str(e)}")
+            output_window.append_output("", "#cc0000")
+            output_window.append_output(f"CRITICAL ERROR: {str(e)}", "#cc0000")
+            output_window.append_output(
+                f"Exception type: {type(e).__name__}", "#cc0000"
+            )
+
+            import traceback
+
+            tb = traceback.format_exc()
+            output_window.append_output("Traceback:", "#cc0000")
+            for line in tb.split("\n"):
+                output_window.append_output(f"  {line}", "#cc0000")
+
             QMessageBox.critical(
                 self, "Launch Error", f"Failed to launch game: {str(e)}"
             )
             self.statusBar().showMessage("Launch failed")
 
-    def handle_stdout(self, game_name: str):
-        """Handle standard output from game process"""
-        if game_name in self.game_processes:
-            process = self.game_processes[game_name]
-            output = (
-                process.readAllStandardOutput().data().decode("utf-8", errors="replace")
-            )
-            if game_name in self.output_windows and output.strip():
-                self.output_windows[game_name].append_output(output.rstrip())
+    def handle_output(self, game_name: str):
+        """Handle all output (stdout and stderr) from game process"""
+        if game_name not in self.game_processes:
+            return
 
-    def handle_stderr(self, game_name: str):
-        """Handle standard error from game process"""
-        if game_name in self.game_processes:
-            process = self.game_processes[game_name]
-            output = (
-                process.readAllStandardError().data().decode("utf-8", errors="replace")
-            )
-            if game_name in self.output_windows and output.strip():
+        process = self.game_processes[game_name]
+
+        stdout_data = process.readAllStandardOutput().data()
+        stderr_data = process.readAllStandardError().data()
+
+        if game_name in self.output_windows:
+            output_window = self.output_windows[game_name]
+
+            if stdout_data:
+                try:
+                    output = stdout_data.decode("utf-8", errors="replace")
+                    for line in output.split("\n"):
+                        if line.strip():
+                            output_window.append_output(f"[OUT] {line.rstrip()}")
+                except Exception as e:
+                    output_window.append_output(
+                        f"[ERROR decoding stdout: {e}]", "#cc0000"
+                    )
+
+            # Process stderr
+            if stderr_data:
+                try:
+                    output = stderr_data.decode("utf-8", errors="replace")
+                    for line in output.split("\n"):
+                        if line.strip():
+                            # Color-code different types of Wine messages
+                            if "err:" in line.lower() or "error" in line.lower():
+                                output_window.append_output(
+                                    f"[ERR] {line.rstrip()}", "#cc0000"
+                                )
+                            elif "warn:" in line.lower() or "warning" in line.lower():
+                                output_window.append_output(
+                                    f"[WARN] {line.rstrip()}", "#cc6600"
+                                )
+                            elif "fixme:" in line.lower():
+                                if output_window.verbose_checkbox.isChecked():
+                                    output_window.append_output(
+                                        f"[FIXME] {line.rstrip()}", "#666666"
+                                    )
+                            else:
+                                output_window.append_output(f"[ERR] {line.rstrip()}")
+                except Exception as e:
+                    output_window.append_output(
+                        f"[ERROR decoding stderr: {e}]", "#cc0000"
+                    )
+
+    def handle_state_changed(self, game_name: str, state):
+        """Handle process state changes"""
+        if game_name not in self.output_windows:
+            return
+
+        output_window = self.output_windows[game_name]
+
+        state_names = {
+            QProcess.NotRunning: "Not Running",
+            QProcess.Starting: "Starting",
+            QProcess.Running: "Running",
+        }
+
+        state_name = state_names.get(state, f"Unknown State ({state})")
+        output_window.append_output(f"Process state changed: {state_name}", "#0066cc")
+
+    def check_process_status(self, game_name: str):
+        """Periodically check process status"""
+        if game_name not in self.game_processes:
+            if game_name in self.process_timers:
+                self.process_timers[game_name].stop()
+                del self.process_timers[game_name]
+            return
+
+        process = self.game_processes[game_name]
+
+        if game_name in self.output_windows:
+            state = process.state()
+            if state == QProcess.NotRunning and process.exitCode() == -1:
+                # Process hasn't started yet - this might indicate a problem
                 self.output_windows[game_name].append_output(
-                    f"[STDERR] {output.rstrip()}"
+                    "Process check: Still waiting to start...", "#cc6600"
                 )
 
     def handle_started(self, game_name: str):
@@ -791,32 +1011,55 @@ class GameLauncher(QMainWindow):
             process = self.game_processes[game_name]
             pid = process.processId()
             if game_name in self.output_windows:
-                self.output_windows[game_name].append_output(
-                    f"Process started with PID: {pid}"
-                )
                 self.output_windows[game_name].append_output("")
-            self.statusBar().showMessage(f"Launched {game_name} (PID: {pid})")
+                self.output_windows[game_name].append_output(
+                    f"✓ Process started successfully (PID: {pid})", "#008800"
+                )
+                self.output_windows[game_name].append_output("─" * 60)
+                self.output_windows[game_name].append_output("")
+            self.statusBar().showMessage(f"{game_name} is running (PID: {pid})")
 
     def handle_finished(self, game_name: str, exit_code: int, exit_status):
         """Handle game process finished"""
         if game_name in self.output_windows:
             self.output_windows[game_name].append_output("")
-            self.output_windows[game_name].append_output(f"=== Process Finished ===")
-            self.output_windows[game_name].append_output(f"Exit Code: {exit_code}")
+            self.output_windows[game_name].append_output("═" * 60, "#0066cc")
+            self.output_windows[game_name].append_output("PROCESS FINISHED", "#0066cc")
+            self.output_windows[game_name].append_output("═" * 60, "#0066cc")
+
+            color = "#008800" if exit_code == 0 else "#cc0000"
             self.output_windows[game_name].append_output(
-                f"Exit Status: {exit_status.name if hasattr(exit_status, 'name') else str(exit_status)}"
+                f"Exit Code: {exit_code}", color
             )
+
+            status_name = (
+                exit_status.name if hasattr(exit_status, "name") else str(exit_status)
+            )
+            self.output_windows[game_name].append_output(
+                f"Exit Status: {status_name}", color
+            )
+
+            if exit_code != 0:
+                self.output_windows[game_name].append_output(
+                    "Non-zero exit code indicates the game may have crashed or encountered an error.",
+                    "#cc6600",
+                )
 
         if game_name in self.game_processes:
             del self.game_processes[game_name]
 
-        self.statusBar().showMessage(f"{game_name} exited with code {exit_code}")
+        if game_name in self.process_timers:
+            self.process_timers[game_name].stop()
+            del self.process_timers[game_name]
+
+        status_msg = f"{game_name} exited (code: {exit_code})"
+        self.statusBar().showMessage(status_msg)
 
     def handle_error(self, game_name: str, error):
         """Handle game process error"""
         error_messages = {
-            QProcess.FailedToStart: "Failed to start Wine process",
-            QProcess.Crashed: "Wine process crashed",
+            QProcess.FailedToStart: "Failed to start Wine process - check if Wine is installed",
+            QProcess.Crashed: "Wine process crashed unexpectedly",
             QProcess.Timedout: "Wine process timed out",
             QProcess.WriteError: "Write error occurred",
             QProcess.ReadError: "Read error occurred",
@@ -826,10 +1069,32 @@ class GameLauncher(QMainWindow):
         error_msg = error_messages.get(error, f"Error code: {error}")
 
         if game_name in self.output_windows:
-            self.output_windows[game_name].append_output(f"ERROR: {error_msg}")
+            self.output_windows[game_name].append_output("")
+            self.output_windows[game_name].append_output("═" * 60, "#cc0000")
+            self.output_windows[game_name].append_output(
+                f"PROCESS ERROR: {error_msg}", "#cc0000"
+            )
+            self.output_windows[game_name].append_output("═" * 60, "#cc0000")
+
+            if error == QProcess.FailedToStart:
+                self.output_windows[game_name].append_output(
+                    "Troubleshooting steps:", "#cc6600"
+                )
+                self.output_windows[game_name].append_output(
+                    "1. Verify Wine is installed: wine --version"
+                )
+                self.output_windows[game_name].append_output(
+                    "2. Check if the executable path is correct"
+                )
+                self.output_windows[game_name].append_output(
+                    "3. Verify the Wine prefix exists and is valid"
+                )
+                self.output_windows[game_name].append_output(
+                    "4. Try running the command manually from terminal"
+                )
 
         QMessageBox.critical(
-            self, "Launch Error", f"Failed to launch {game_name}: {error_msg}"
+            self, "Launch Error", f"Failed to launch {game_name}:\n\n{error_msg}"
         )
         self.statusBar().showMessage(f"Launch failed: {error_msg}")
 
