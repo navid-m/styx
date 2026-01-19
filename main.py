@@ -272,7 +272,6 @@ class ChangePrefixDialog(QDialog):
         self.prefix_combo = QComboBox()
         for prefix in self.available_prefixes:
             self.prefix_combo.addItem(prefix["name"], prefix["path"])
-            # Select current prefix if in list
             if prefix["path"] == self.game["prefix"]:
                 self.prefix_combo.setCurrentIndex(self.prefix_combo.count() - 1)
 
