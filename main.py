@@ -12,14 +12,12 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QPushButton,
-    QListWidget,
     QLabel,
     QFileDialog,
     QComboBox,
     QMessageBox,
     QDialog,
     QLineEdit,
-    QListWidgetItem,
     QGroupBox,
     QTextEdit,
     QScrollArea,
@@ -32,6 +30,8 @@ from PySide6.QtGui import QFont, QColor, QTextCursor
 
 class GameOutputWindow(QMainWindow):
     """Window for displaying game launch output and debug information"""
+
+    abort_requested = Signal(str)
 
     def __init__(self, game_name: str, parent=None):
         super().__init__(parent)
@@ -66,6 +66,15 @@ class GameOutputWindow(QMainWindow):
 
         button_layout = QHBoxLayout()
         button_layout.addStretch()
+
+        self.abort_btn = QPushButton("Abort Launch")
+        self.abort_btn.setMinimumHeight(32)
+        self.abort_btn.setMinimumWidth(100)
+        self.abort_btn.setStyleSheet(
+            "QPushButton { background-color: #cc0000; color: white; font-weight: bold; }"
+        )
+        self.abort_btn.clicked.connect(self.abort_launch)
+        button_layout.addWidget(self.abort_btn)
 
         save_btn = QPushButton("Save Log")
         save_btn.setMinimumHeight(32)
@@ -106,6 +115,10 @@ class GameOutputWindow(QMainWindow):
     def clear_output(self):
         """Clear all output"""
         self.output_text.clear()
+
+    def abort_launch(self):
+        """Request abortion of the game launch"""
+        self.abort_requested.emit(self.game_name)
 
     def save_log(self):
         """Save the output log to a file"""
@@ -265,6 +278,78 @@ class PrefixScanner(QThread):
                 continue
 
         return prefixes
+
+
+class RenameGameDialog(QDialog):
+    """Dialog for renaming a game"""
+
+    def __init__(self, game: Dict[str, str], parent=None):
+        super().__init__(parent)
+        self.game = game
+        self.new_name = None
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle(f"Rename Game - {self.game['name']}")
+        self.setMinimumWidth(450)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+
+        current_group = QGroupBox("Current Name")
+        current_layout = QVBoxLayout()
+        current_label = QLabel(self.game["name"])
+        current_label.setWordWrap(True)
+        current_layout.addWidget(current_label)
+        current_group.setLayout(current_layout)
+        layout.addWidget(current_group)
+
+        new_group = QGroupBox("New Name")
+        new_layout = QVBoxLayout()
+
+        name_layout = QHBoxLayout()
+        name_label = QLabel("Game Name:")
+        name_label.setMinimumWidth(100)
+        name_layout.addWidget(name_label)
+
+        self.name_input = QLineEdit()
+        self.name_input.setText(self.game["name"])
+        self.name_input.setPlaceholderText("Enter new game name")
+        name_layout.addWidget(self.name_input)
+
+        new_layout.addLayout(name_layout)
+        new_group.setLayout(new_layout)
+        layout.addWidget(new_group)
+
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        ok_btn = QPushButton("Rename")
+        ok_btn.setMinimumWidth(100)
+        ok_btn.setMinimumHeight(32)
+        ok_btn.clicked.connect(self.accept_rename)
+        button_layout.addWidget(ok_btn)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setMinimumWidth(80)
+        cancel_btn.setMinimumHeight(32)
+        cancel_btn.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_btn)
+
+        layout.addLayout(button_layout)
+
+        self.setLayout(layout)
+
+    def accept_rename(self):
+        new_name = self.name_input.text().strip()
+
+        if not new_name:
+            QMessageBox.warning(self, "Error", "Game name cannot be empty.")
+            return
+
+        self.new_name = new_name
+        self.accept()
 
 
 class ChangePrefixDialog(QDialog):
@@ -488,6 +573,7 @@ class GameItemWidget(QWidget):
 
     launch_clicked = Signal(dict)
     change_prefix_clicked = Signal(dict)
+    rename_clicked = Signal(dict)
 
     def __init__(self, game: Dict[str, str], parent=None):
         super().__init__(parent)
@@ -499,7 +585,6 @@ class GameItemWidget(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(10)
 
-        # Game name and info
         info_layout = QVBoxLayout()
         info_layout.setSpacing(2)
 
@@ -519,7 +604,12 @@ class GameItemWidget(QWidget):
 
         layout.addLayout(info_layout, 1)
 
-        # Buttons
+        rename_btn = QPushButton("Rename")
+        rename_btn.setMinimumHeight(28)
+        rename_btn.setMaximumWidth(100)
+        rename_btn.clicked.connect(lambda: self.rename_clicked.emit(self.game))
+        layout.addWidget(rename_btn)
+
         change_prefix_btn = QPushButton("Change Prefix")
         change_prefix_btn.setMinimumHeight(28)
         change_prefix_btn.setMaximumWidth(120)
@@ -538,8 +628,6 @@ class GameItemWidget(QWidget):
         layout.addWidget(launch_btn)
 
         self.setLayout(layout)
-
-        # Add frame styling
         self.setFrameStyle(QFrame.Box | QFrame.Plain)
         self.setStyleSheet(
             "GameItemWidget { border: 1px solid #ccc; border-radius: 4px; background-color: #f9f9f9; }"
@@ -592,7 +680,6 @@ class GameLauncher(QMainWindow):
         list_layout = QVBoxLayout()
         list_layout.setContentsMargins(5, 10, 5, 5)
 
-        # Container for games with custom widgets
         self.games_container = QWidget()
         self.games_layout = QVBoxLayout(self.games_container)
         self.games_layout.setContentsMargins(0, 0, 0, 0)
@@ -607,7 +694,7 @@ class GameLauncher(QMainWindow):
         list_group.setLayout(list_layout)
         main_layout.addWidget(list_group)
 
-        self.game_widgets = []  # Track game widgets
+        self.game_widgets = []
 
         button_layout = QHBoxLayout()
         button_layout.setSpacing(8)
@@ -677,6 +764,7 @@ class GameLauncher(QMainWindow):
             game_widget = GameItemWidget(game)
             game_widget.launch_clicked.connect(self.launch_game)
             game_widget.change_prefix_clicked.connect(self.change_game_prefix)
+            game_widget.rename_clicked.connect(self.rename_game)
             self.games_layout.insertWidget(self.games_layout.count(), game_widget)
             self.game_widgets.append(game_widget)
 
@@ -732,6 +820,21 @@ class GameLauncher(QMainWindow):
                     self.refresh_games_list()
                     self.statusBar().showMessage(
                         f"Changed prefix for {game['name']} from {Path(old_prefix).name} to {Path(dialog.new_prefix).name}"
+                    )
+                    break
+
+    def rename_game(self, game: Dict[str, str]):
+        """Open dialog to rename a game"""
+        dialog = RenameGameDialog(game, self)
+        if dialog.exec() == QDialog.Accepted:
+            for g in self.games:
+                if g["name"] == game["name"]:
+                    old_name = g["name"]
+                    g["name"] = dialog.new_name
+                    self.save_games()
+                    self.refresh_games_list()
+                    self.statusBar().showMessage(
+                        f"Renamed '{old_name}' to '{dialog.new_name}'"
                     )
                     break
 
@@ -791,6 +894,7 @@ class GameLauncher(QMainWindow):
 
         output_window = GameOutputWindow(game_name, self)
         self.output_windows[game_name] = output_window
+        output_window.abort_requested.connect(self.abort_game_launch)
         output_window.show()
 
         output_window.append_output("═" * 60, "#0066cc")
@@ -944,13 +1048,11 @@ class GameLauncher(QMainWindow):
                         f"[ERROR decoding stdout: {e}]", "#cc0000"
                     )
 
-            # Process stderr
             if stderr_data:
                 try:
                     output = stderr_data.decode("utf-8", errors="replace")
                     for line in output.split("\n"):
                         if line.strip():
-                            # Color-code different types of Wine messages
                             if "err:" in line.lower() or "error" in line.lower():
                                 output_window.append_output(
                                     f"[ERR] {line.rstrip()}", "#cc0000"
@@ -1019,6 +1121,54 @@ class GameLauncher(QMainWindow):
                 self.output_windows[game_name].append_output("")
             self.statusBar().showMessage(f"{game_name} is running (PID: {pid})")
 
+    def abort_game_launch(self, game_name: str):
+        """Abort a game launch by terminating its process"""
+        if game_name in self.game_processes:
+            process = self.game_processes[game_name]
+            if process.state() != QProcess.NotRunning:
+                reply = QMessageBox.question(
+                    self,
+                    "Abort Launch",
+                    f"Are you sure you want to abort the launch of '{game_name}'?",
+                    QMessageBox.Yes | QMessageBox.No,
+                )
+
+                if reply == QMessageBox.Yes:
+                    if game_name in self.output_windows:
+                        self.output_windows[game_name].append_output("")
+                        self.output_windows[game_name].append_output(
+                            "═" * 60, "#cc6600"
+                        )
+                        self.output_windows[game_name].append_output(
+                            "ABORTING LAUNCH", "#cc6600"
+                        )
+                        self.output_windows[game_name].append_output(
+                            "═" * 60, "#cc6600"
+                        )
+                        self.output_windows[game_name].append_output(
+                            "User requested abort. Terminating process...", "#cc6600"
+                        )
+
+                    process.kill()
+                    process.waitForFinished(3000)
+
+                    if game_name in self.output_windows:
+                        self.output_windows[game_name].append_output(
+                            "Process terminated.", "#cc0000"
+                        )
+                        self.output_windows[game_name].abort_btn.setEnabled(False)
+
+                    self.statusBar().showMessage(f"Aborted launch of {game_name}")
+            else:
+                if game_name in self.output_windows:
+                    self.output_windows[game_name].append_output(
+                        "Cannot abort: Process is not running.", "#cc6600"
+                    )
+        else:
+            QMessageBox.information(
+                self, "Info", f"No active process found for '{game_name}'."
+            )
+
     def handle_finished(self, game_name: str, exit_code: int, exit_status):
         """Handle game process finished"""
         if game_name in self.output_windows:
@@ -1044,6 +1194,8 @@ class GameLauncher(QMainWindow):
                     "Non-zero exit code indicates the game may have crashed or encountered an error.",
                     "#cc6600",
                 )
+
+            self.output_windows[game_name].abort_btn.setEnabled(False)
 
         if game_name in self.game_processes:
             del self.game_processes[game_name]
@@ -1092,6 +1244,8 @@ class GameLauncher(QMainWindow):
                 self.output_windows[game_name].append_output(
                     "4. Try running the command manually from terminal"
                 )
+
+            self.output_windows[game_name].abort_btn.setEnabled(False)
 
         QMessageBox.critical(
             self, "Launch Error", f"Failed to launch {game_name}:\n\n{error_msg}"
