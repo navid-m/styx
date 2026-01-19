@@ -550,7 +550,7 @@ class GameLauncher(QMainWindow):
         title_label.setFont(title_font)
         main_layout.addWidget(title_label)
 
-        list_group = QGroupBox("Games")
+        list_group = QGroupBox("")
         list_layout = QVBoxLayout()
         list_layout.setContentsMargins(5, 10, 5, 5)
 
