@@ -1257,12 +1257,9 @@ class GameLauncher : JFrame("Hydra") {
         scrollPane.border = BorderFactory.createTitledBorder("")
         mainPanel.add(scrollPane, BorderLayout.CENTER)
 
-        val buttonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 8, 0))
-
-        val addBtn = JButton("Add Game").apply {
-            preferredSize = Dimension(120, 32)
-            addActionListener { addGame() }
-        }
+        val fullBottomPanel = JPanel(BorderLayout())
+        val buttonRowPanel = JPanel(BorderLayout())
+        val leftButtonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 8, 0))
 
         val removeBtn = JButton("Remove Game").apply {
             preferredSize = Dimension(120, 32)
@@ -1274,18 +1271,33 @@ class GameLauncher : JFrame("Hydra") {
             addActionListener { scanPrefixes() }
         }
 
-        buttonPanel.add(addBtn)
-        buttonPanel.add(removeBtn)
-        buttonPanel.add(rescanBtn)
-
-        mainPanel.add(buttonPanel, BorderLayout.SOUTH)
-
-        contentPane = mainPanel
-
+        leftButtonPanel.add(removeBtn)
+        leftButtonPanel.add(rescanBtn)
+        
+        val rightButtonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
+        
+        val addBtn = JButton("Add Game").apply {
+            preferredSize = Dimension(150, 35)
+            font = font.deriveFont(Font.BOLD)
+            addActionListener { addGame() }
+        }
+        
+        rightButtonPanel.add(addBtn)
+        
+        buttonRowPanel.add(leftButtonPanel, BorderLayout.WEST)
+        buttonRowPanel.add(rightButtonPanel, BorderLayout.EAST)
+        
+        fullBottomPanel.add(buttonRowPanel, BorderLayout.NORTH)
+        
         val statusPanel = JPanel(BorderLayout())
         statusPanel.border = EmptyBorder(5, 10, 5, 10)
         statusPanel.add(statusLabel, BorderLayout.WEST)
-        contentPane.add(statusPanel, BorderLayout.SOUTH)
+        
+        fullBottomPanel.add(statusPanel, BorderLayout.SOUTH)
+
+        mainPanel.add(fullBottomPanel, BorderLayout.SOUTH)
+
+        contentPane = mainPanel
 
         pack()
         setLocationRelativeTo(null)
