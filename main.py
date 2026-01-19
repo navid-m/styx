@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QGroupBox,
     QTextEdit,
+    QScrollArea,
+    QFrame,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QProcess
 from PySide6.QtGui import QFont
@@ -228,6 +230,108 @@ class PrefixScanner(QThread):
         return prefixes
 
 
+class ChangePrefixDialog(QDialog):
+    """Dialog for changing a game's Wine prefix"""
+
+    def __init__(
+        self,
+        game: Dict[str, str],
+        available_prefixes: List[Dict[str, str]],
+        parent=None,
+    ):
+        super().__init__(parent)
+        self.game = game
+        self.available_prefixes = available_prefixes
+        self.new_prefix = None
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle(f"Change Wine Prefix - {self.game['name']}")
+        self.setMinimumWidth(550)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+
+        current_group = QGroupBox("Current Prefix")
+        current_layout = QVBoxLayout()
+        current_label = QLabel(self.game["prefix"])
+        current_label.setWordWrap(True)
+        current_layout.addWidget(current_label)
+        current_group.setLayout(current_layout)
+        layout.addWidget(current_group)
+
+        new_group = QGroupBox("Select New Prefix")
+        new_layout = QVBoxLayout()
+
+        prefix_layout = QHBoxLayout()
+        prefix_label = QLabel("Wine Prefix:")
+        prefix_label.setMinimumWidth(100)
+        prefix_layout.addWidget(prefix_label)
+
+        self.prefix_combo = QComboBox()
+        for prefix in self.available_prefixes:
+            self.prefix_combo.addItem(prefix["name"], prefix["path"])
+            # Select current prefix if in list
+            if prefix["path"] == self.game["prefix"]:
+                self.prefix_combo.setCurrentIndex(self.prefix_combo.count() - 1)
+
+        prefix_layout.addWidget(self.prefix_combo)
+
+        browse_btn = QPushButton("Browse...")
+        browse_btn.setMaximumWidth(100)
+        browse_btn.setMinimumHeight(28)
+        browse_btn.clicked.connect(self.browse_prefix)
+        prefix_layout.addWidget(browse_btn)
+
+        new_layout.addLayout(prefix_layout)
+        new_group.setLayout(new_layout)
+        layout.addWidget(new_group)
+
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        ok_btn = QPushButton("Change Prefix")
+        ok_btn.setMinimumWidth(120)
+        ok_btn.setMinimumHeight(32)
+        ok_btn.clicked.connect(self.accept_change)
+        button_layout.addWidget(ok_btn)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setMinimumWidth(80)
+        cancel_btn.setMinimumHeight(32)
+        cancel_btn.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_btn)
+
+        layout.addLayout(button_layout)
+
+        self.setLayout(layout)
+
+    def browse_prefix(self):
+        dir_path = QFileDialog.getExistingDirectory(
+            self, "Select Wine Prefix Directory"
+        )
+        if dir_path:
+            self.prefix_combo.addItem(f"Custom - {Path(dir_path).name}", dir_path)
+            self.prefix_combo.setCurrentIndex(self.prefix_combo.count() - 1)
+
+    def accept_change(self):
+        new_prefix_path = self.prefix_combo.currentData()
+
+        if not new_prefix_path or not os.path.exists(new_prefix_path):
+            QMessageBox.warning(self, "Invalid Input", "Select a valid Wine prefix.")
+            return
+
+        if new_prefix_path == self.game["prefix"]:
+            QMessageBox.information(
+                self, "No Change", "The selected prefix is already set for this game."
+            )
+            return
+
+        self.new_prefix = new_prefix_path
+        self.accept()
+
+
 class AddGameDialog(QDialog):
     """Dialog for adding a new game"""
 
@@ -343,6 +447,79 @@ class AddGameDialog(QDialog):
         self.accept()
 
 
+class GameItemWidget(QWidget):
+    """Custom widget for displaying a game item with buttons"""
+
+    launch_clicked = Signal(dict)
+    change_prefix_clicked = Signal(dict)
+
+    def __init__(self, game: Dict[str, str], parent=None):
+        super().__init__(parent)
+        self.game = game
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QHBoxLayout()
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(10)
+
+        # Game name and info
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(2)
+
+        name_label = QLabel(self.game["name"])
+        name_font = QFont()
+        name_font.setPointSize(10)
+        name_font.setBold(True)
+        name_label.setFont(name_font)
+        info_layout.addWidget(name_label)
+
+        prefix_label = QLabel(f"Prefix: {Path(self.game['prefix']).name}")
+        prefix_font = QFont()
+        prefix_font.setPointSize(8)
+        prefix_label.setFont(prefix_font)
+        prefix_label.setStyleSheet("color: #666;")
+        info_layout.addWidget(prefix_label)
+
+        layout.addLayout(info_layout, 1)
+
+        # Buttons
+        change_prefix_btn = QPushButton("Change Prefix")
+        change_prefix_btn.setMinimumHeight(28)
+        change_prefix_btn.setMaximumWidth(120)
+        change_prefix_btn.clicked.connect(
+            lambda: self.change_prefix_clicked.emit(self.game)
+        )
+        layout.addWidget(change_prefix_btn)
+
+        launch_btn = QPushButton("Launch")
+        launch_btn.setMinimumHeight(28)
+        launch_btn.setMaximumWidth(80)
+        launch_font = QFont()
+        launch_font.setBold(True)
+        launch_btn.setFont(launch_font)
+        launch_btn.clicked.connect(lambda: self.launch_clicked.emit(self.game))
+        layout.addWidget(launch_btn)
+
+        self.setLayout(layout)
+
+        # Add frame styling
+        self.setFrameStyle(QFrame.Box | QFrame.Plain)
+        self.setStyleSheet(
+            "GameItemWidget { border: 1px solid #ccc; border-radius: 4px; background-color: #f9f9f9; }"
+        )
+
+    def setFrameStyle(self, style):
+        """Make this widget have a frame"""
+        pass  # Handled by stylesheet
+
+    def update_game(self, game: Dict[str, str]):
+        """Update the widget with new game data"""
+        self.game = game
+        # Refresh the UI
+        self.deleteLater()
+
+
 class GameLauncher(QMainWindow):
     """Main window for the Wine/Proton game launcher"""
 
@@ -377,11 +554,23 @@ class GameLauncher(QMainWindow):
         list_group = QGroupBox("Games")
         list_layout = QVBoxLayout()
         list_layout.setContentsMargins(5, 10, 5, 5)
-        self.games_list = QListWidget()
-        self.games_list.itemDoubleClicked.connect(self.launch_selected_game)
-        list_layout.addWidget(self.games_list)
+
+        # Container for games with custom widgets
+        self.games_container = QWidget()
+        self.games_layout = QVBoxLayout(self.games_container)
+        self.games_layout.setContentsMargins(0, 0, 0, 0)
+        self.games_layout.setSpacing(5)
+        self.games_layout.addStretch()
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(self.games_container)
+        list_layout.addWidget(scroll_area)
+
         list_group.setLayout(list_layout)
         main_layout.addWidget(list_group)
+
+        self.game_widgets = []  # Track game widgets
 
         button_layout = QHBoxLayout()
         button_layout.setSpacing(8)
@@ -395,14 +584,6 @@ class GameLauncher(QMainWindow):
         remove_btn.setMinimumHeight(32)
         remove_btn.clicked.connect(self.remove_game)
         button_layout.addWidget(remove_btn)
-
-        launch_btn = QPushButton("Launch Game")
-        launch_btn.setMinimumHeight(32)
-        launch_btn.clicked.connect(self.launch_selected_game)
-        launch_font = QFont()
-        launch_font.setBold(True)
-        launch_btn.setFont(launch_font)
-        button_layout.addWidget(launch_btn)
 
         rescan_btn = QPushButton("Rescan Prefixes")
         rescan_btn.setMinimumHeight(32)
@@ -446,11 +627,23 @@ class GameLauncher(QMainWindow):
 
     def refresh_games_list(self):
         """Refresh the games list widget"""
-        self.games_list.clear()
+        for widget in self.game_widgets:
+            widget.deleteLater()
+        self.game_widgets.clear()
+
+        if self.games_layout.count() > 0:
+            item = self.games_layout.takeAt(self.games_layout.count() - 1)
+            if item:
+                item.invalidate()
+
         for game in self.games:
-            item = QListWidgetItem(game["name"])
-            item.setData(Qt.UserRole, game)
-            self.games_list.addItem(item)
+            game_widget = GameItemWidget(game)
+            game_widget.launch_clicked.connect(self.launch_game)
+            game_widget.change_prefix_clicked.connect(self.change_game_prefix)
+            self.games_layout.insertWidget(self.games_layout.count(), game_widget)
+            self.game_widgets.append(game_widget)
+
+        self.games_layout.addStretch()
 
     def add_game(self):
         """Open dialog to add a new game"""
@@ -463,38 +656,47 @@ class GameLauncher(QMainWindow):
 
     def remove_game(self):
         """Remove selected game"""
-        current_item = self.games_list.currentItem()
-        if not current_item:
-            QMessageBox.information(
-                self, "No Selection", "Please select a game to remove."
-            )
+        if not self.games:
+            QMessageBox.information(self, "No Games", "No games in the library.")
             return
 
-        game = current_item.data(Qt.UserRole)
-        reply = QMessageBox.question(
-            self,
-            "Confirm Removal",
-            f"Remove '{game['name']}' from the library?",
-            QMessageBox.Yes | QMessageBox.No,
+        from PySide6.QtWidgets import QInputDialog
+
+        game_names = [game["name"] for game in self.games]
+        game_name, ok = QInputDialog.getItem(
+            self, "Remove Game", "Select game to remove:", game_names, 0, False
         )
 
-        if reply == QMessageBox.Yes:
-            self.games.remove(game)
-            self.save_games()
-            self.refresh_games_list()
-            self.statusBar().showMessage(f"Removed {game['name']}")
+        if ok and game_name:
+            game = next((g for g in self.games if g["name"] == game_name), None)
+            if game:
+                reply = QMessageBox.question(
+                    self,
+                    "Confirm Removal",
+                    f"Remove '{game['name']}' from the library?",
+                    QMessageBox.Yes | QMessageBox.No,
+                )
 
-    def launch_selected_game(self):
-        """Launch the selected game with its Wine prefix"""
-        current_item = self.games_list.currentItem()
-        if not current_item:
-            QMessageBox.information(
-                self, "No Selection", "Please select a game to launch."
-            )
-            return
+                if reply == QMessageBox.Yes:
+                    self.games.remove(game)
+                    self.save_games()
+                    self.refresh_games_list()
+                    self.statusBar().showMessage(f"Removed {game['name']}")
 
-        game = current_item.data(Qt.UserRole)
-        self.launch_game(game)
+    def change_game_prefix(self, game: Dict[str, str]):
+        """Open dialog to change a game's Wine prefix"""
+        dialog = ChangePrefixDialog(game, self.available_prefixes, self)
+        if dialog.exec() == QDialog.Accepted:
+            for g in self.games:
+                if g["name"] == game["name"]:
+                    old_prefix = g["prefix"]
+                    g["prefix"] = dialog.new_prefix
+                    self.save_games()
+                    self.refresh_games_list()
+                    self.statusBar().showMessage(
+                        f"Changed prefix for {game['name']} from {Path(old_prefix).name} to {Path(dialog.new_prefix).name}"
+                    )
+                    break
 
     def launch_game(self, game: Dict[str, str]):
         """Launch a game using Wine with the specified prefix"""
@@ -549,7 +751,6 @@ class GameLauncher(QMainWindow):
                 lambda error: self.handle_error(game_name, error)
             )
 
-            # Launch the game
             exe_path_abs = os.path.abspath(exe_path)
             process.start("wine", [exe_path_abs])
 
