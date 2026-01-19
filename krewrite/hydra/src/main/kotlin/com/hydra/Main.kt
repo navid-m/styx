@@ -20,7 +20,8 @@ data class Game(
     var prefix: String,
     var protonVersion: String? = null,
     var protonPath: String? = null,
-    var protonBin: String? = null
+    var protonBin: String? = null,
+    var launchOptions: MutableMap<String, String> = mutableMapOf()
 )
 
 data class PrefixInfo(
@@ -598,8 +599,8 @@ class ProtonManagerDialog(
 
         val clearBtn = JButton("Clear (Use Wine)").apply {
             preferredSize = Dimension(130, 32)
-            addActionListener { 
-                protonCombo.selectedIndex = 0 // Select "Wine (default)"
+            addActionListener {
+                protonCombo.selectedIndex = 0
                 selectedProton = null
                 dispose()
             }
@@ -731,6 +732,165 @@ class ProtonManagerDialog(
     private fun applyProton() {
         val selected = protonCombo.selectedItem as? ProtonComboItem
         selectedProton = selected?.info
+        dispose()
+    }
+}
+
+class LaunchOptionsDialog(
+    private val game: Game,
+    parent: JFrame
+) : JDialog(parent, "Launch Options - ${game.name}", true) {
+
+    private val tableModel = javax.swing.table.DefaultTableModel(arrayOf("Variable", "Value"), 0)
+    private val table = JTable(tableModel)
+    val launchOptions = mutableMapOf<String, String>()
+
+    init {
+        initUI()
+        loadExistingOptions()
+    }
+
+    private fun initUI() {
+        minimumSize = Dimension(600, 400)
+
+        val mainPanel = JPanel(BorderLayout(10, 10))
+        mainPanel.border = EmptyBorder(10, 10, 10, 10)
+
+        val titleLabel = JLabel("Environment Variables / Launch Options")
+        titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 11f)
+        titleLabel.border = EmptyBorder(0, 0, 10, 0)
+        mainPanel.add(titleLabel, BorderLayout.NORTH)
+
+        val infoLabel = JLabel(
+            "<html>Add environment variables that will be set when launching this game.<br>" +
+                    "Examples: DXVK_CONFIG_FILE, MANGOHUD, PROTON_USE_WINED3D, etc.</html>"
+        )
+        infoLabel.foreground = Color(0x66, 0x66, 0x66)
+        infoLabel.border = EmptyBorder(0, 0, 10, 0)
+        val topPanel = JPanel(BorderLayout())
+        topPanel.add(infoLabel, BorderLayout.NORTH)
+        mainPanel.add(topPanel, BorderLayout.NORTH)
+
+        table.fillsViewportHeight = true
+        val scrollPane = JScrollPane(table)
+        mainPanel.add(scrollPane, BorderLayout.CENTER)
+
+        val buttonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 8, 0))
+
+        val addBtn = JButton("Add Variable").apply {
+            preferredSize = Dimension(120, 32)
+            addActionListener { addRow() }
+        }
+
+        val removeBtn = JButton("Remove Selected").apply {
+            preferredSize = Dimension(140, 32)
+            addActionListener { removeSelectedRow() }
+        }
+
+        val presetBtn = JButton("Common Presets...").apply {
+            preferredSize = Dimension(150, 32)
+            addActionListener { showPresets() }
+        }
+
+        buttonPanel.add(addBtn)
+        buttonPanel.add(removeBtn)
+        buttonPanel.add(presetBtn)
+
+        val bottomPanel = JPanel(BorderLayout())
+        bottomPanel.add(buttonPanel, BorderLayout.WEST)
+
+        val saveButtonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
+
+        val saveBtn = JButton("Save").apply {
+            preferredSize = Dimension(100, 32)
+            addActionListener { saveOptions() }
+        }
+
+        val cancelBtn = JButton("Cancel").apply {
+            preferredSize = Dimension(80, 32)
+            addActionListener { dispose() }
+        }
+
+        saveButtonPanel.add(saveBtn)
+        saveButtonPanel.add(cancelBtn)
+        bottomPanel.add(saveButtonPanel, BorderLayout.EAST)
+
+        mainPanel.add(bottomPanel, BorderLayout.SOUTH)
+
+        contentPane = mainPanel
+        pack()
+        setLocationRelativeTo(parent)
+    }
+
+    private fun loadExistingOptions() {
+        game.launchOptions?.forEach { (key, value) ->
+            tableModel.addRow(arrayOf(key, value))
+        } ?: run {
+            // Initialize empty map if null
+            game.launchOptions = mutableMapOf()
+        }
+    }
+
+    private fun addRow() {
+        tableModel.addRow(arrayOf("", ""))
+        val lastRow = tableModel.rowCount - 1
+        table.editCellAt(lastRow, 0)
+        table.requestFocus()
+    }
+
+    private fun removeSelectedRow() {
+        val selectedRow = table.selectedRow
+        if (selectedRow >= 0) {
+            tableModel.removeRow(selectedRow)
+        } else {
+            JOptionPane.showMessageDialog(
+                this,
+                "Please select a row to remove.",
+                "No Selection",
+                JOptionPane.INFORMATION_MESSAGE
+            )
+        }
+    }
+
+    private fun showPresets() {
+        val presets = mapOf(
+            "Enable DXVK HUD" to ("DXVK_HUD" to "fps,devinfo"),
+            "Enable MangoHUD" to ("MANGOHUD" to "1"),
+            "Enable DXVK Async" to ("DXVK_ASYNC" to "1"),
+            "Force WineD3D" to ("PROTON_USE_WINED3D" to "1"),
+            "Enable DXVK State Cache" to ("DXVK_STATE_CACHE" to "1"),
+            "Disable NVAPI" to ("DXVK_NVAPI_DISABLE" to "1"),
+            "Enable Esync" to ("WINEESYNC" to "1"),
+            "Enable Fsync" to ("WINEFSYNC" to "1"),
+            "Set DXVK Log Level (Info)" to ("DXVK_LOG_LEVEL" to "info")
+        )
+
+        val options = presets.keys.toTypedArray()
+        val choice = JOptionPane.showInputDialog(
+            this,
+            "Select a preset to add:",
+            "Common Presets",
+            JOptionPane.PLAIN_MESSAGE,
+            null,
+            options,
+            options[0]
+        ) as? String
+
+        if (choice != null) {
+            val (key, value) = presets[choice]!!
+            tableModel.addRow(arrayOf(key, value))
+        }
+    }
+
+    private fun saveOptions() {
+        launchOptions.clear()
+        for (i in 0 until tableModel.rowCount) {
+            val key = tableModel.getValueAt(i, 0)?.toString()?.trim() ?: ""
+            val value = tableModel.getValueAt(i, 1)?.toString()?.trim() ?: ""
+            if (key.isNotEmpty()) {
+                launchOptions[key] = value
+            }
+        }
         dispose()
     }
 }
@@ -884,7 +1044,8 @@ class GameItemWidget(
     private val onLaunch: (Game) -> Unit,
     private val onChangePrefix: (Game) -> Unit,
     private val onProtonManager: (Game) -> Unit,
-    private val onPrefixManager: (Game) -> Unit
+    private val onPrefixManager: (Game) -> Unit,
+    private val onLaunchOptions: (Game) -> Unit
 ) : JPanel() {
 
     init {
@@ -915,6 +1076,15 @@ class GameItemWidget(
 
         add(infoPanel)
         add(Box.createHorizontalGlue())
+
+        val loBtn = JButton("LO").apply {
+            preferredSize = Dimension(80, 28)
+            maximumSize = Dimension(80, 28)
+            toolTipText = "Launch Options"
+            addActionListener { onLaunchOptions(game) }
+        }
+        add(loBtn)
+        add(Box.createHorizontalStrut(5))
 
         val wpmBtn = JButton("WPM").apply {
             preferredSize = Dimension(90, 28)
@@ -1055,7 +1225,13 @@ class GameLauncher : JFrame("Hydra") {
                 val json = configFile.readText()
                 val type = object : TypeToken<List<Game>>() {}.type
                 games.clear()
-                games.addAll(gson.fromJson(json, type))
+                val loadedGames: List<Game> = gson.fromJson(json, type)
+                loadedGames.forEach { game ->
+                    if (game.launchOptions == null) {
+                        game.launchOptions = mutableMapOf()
+                    }
+                }
+                games.addAll(loadedGames)
                 refreshGamesList()
             } catch (e: Exception) {
                 JOptionPane.showMessageDialog(
@@ -1087,7 +1263,8 @@ class GameLauncher : JFrame("Hydra") {
         gamesContainer.removeAll()
 
         games.forEach { game ->
-            val gameWidget = GameItemWidget(game, ::launchGame, ::changeGamePrefix, ::openProtonManager, ::openPrefixManager)
+            val gameWidget =
+                GameItemWidget(game, ::launchGame, ::changeGamePrefix, ::openProtonManager, ::openPrefixManager, ::openLaunchOptions)
             gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 60)
             gamesContainer.add(gameWidget)
             gamesContainer.add(Box.createVerticalStrut(5))
@@ -1189,7 +1366,7 @@ class GameLauncher : JFrame("Hydra") {
 
     private fun openPrefixManager(game: Game) {
         val prefixPath = game.prefix
-        
+
         if (!File(prefixPath).exists()) {
             JOptionPane.showMessageDialog(
                 this,
@@ -1253,6 +1430,26 @@ class GameLauncher : JFrame("Hydra") {
                 }
             }
         }.start()
+    }
+
+    private fun openLaunchOptions(game: Game) {
+        if (game.launchOptions == null) {
+            game.launchOptions = mutableMapOf()
+        }
+        
+        val dialog = LaunchOptionsDialog(game, this)
+        dialog.isVisible = true
+
+        val gameInList = games.find { it.name == game.name }
+        if (gameInList != null) {
+            if (gameInList.launchOptions == null) {
+                gameInList.launchOptions = mutableMapOf()
+            }
+            gameInList.launchOptions.clear()
+            gameInList.launchOptions.putAll(dialog.launchOptions)
+            saveGames()
+            statusLabel.text = "Updated launch options for ${game.name}"
+        }
     }
 
     private fun checkWineAvailability(outputWindow: GameOutputWindow): Boolean {
@@ -1362,6 +1559,10 @@ class GameLauncher : JFrame("Hydra") {
                 env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = game.protonPath ?: ""
             }
 
+            game.launchOptions.forEach { (key, value) ->
+                env[key] = value
+            }
+
             if (outputWindow.isVerboseMode()) {
                 env["WINEDEBUG"] = "+all"
                 outputWindow.appendOutput("Verbose mode enabled: WINEDEBUG=+all", "#0066cc")
@@ -1375,10 +1576,20 @@ class GameLauncher : JFrame("Hydra") {
 
             outputWindow.appendOutput("")
             outputWindow.appendOutput("=== Environment Variables ===", "#0066cc")
-            env.filter { it.key.startsWith("WINE") || it.key == "DISPLAY" || it.key.startsWith("STEAM_COMPAT") }
-                .forEach { (key, value) ->
-                    outputWindow.appendOutput("  $key=$value")
-                }
+            env.filter { 
+                it.key.startsWith("WINE") || 
+                it.key == "DISPLAY" || 
+                it.key.startsWith("STEAM_COMPAT") ||
+                it.key.startsWith("DXVK") ||
+                it.key.startsWith("PROTON") ||
+                it.key == "MANGOHUD" ||
+                (game.launchOptions.containsKey(it.key) == true)
+            }.forEach { (key, value) ->
+                outputWindow.appendOutput("  $key=$value")
+            }
+            if (game.launchOptions.isNotEmpty() == true) {
+                outputWindow.appendOutput("Custom launch options: ${game.launchOptions.size ?: 0} variable(s)", "#00aa00")
+            }
             outputWindow.appendOutput("")
 
             processBuilder.directory(File(exePath).parentFile)
@@ -1413,7 +1624,7 @@ class GameLauncher : JFrame("Hydra") {
 
             val pid = process.pid()
             outputWindow.appendOutput("")
-            outputWindow.appendOutput("✓ Process started successfully (PID: $pid)", "#008800")
+            outputWindow.appendOutput("Process started successfully (PID: $pid).", "#008800")
             outputWindow.appendOutput("─".repeat(60))
             outputWindow.appendOutput("")
 

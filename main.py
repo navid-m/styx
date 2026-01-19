@@ -431,6 +431,12 @@ class ProtonManagerDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
+        clear_btn = QPushButton("Clear (Use Wine)")
+        clear_btn.setMinimumWidth(130)
+        clear_btn.setMinimumHeight(32)
+        clear_btn.clicked.connect(self.clear_proton)
+        button_layout.addWidget(clear_btn)
+
         apply_btn = QPushButton("Apply Proton Version")
         apply_btn.setMinimumWidth(150)
         apply_btn.setMinimumHeight(32)
@@ -537,6 +543,12 @@ class ProtonManagerDialog(QDialog):
         else:
             self.selected_proton = current_data
 
+        self.accept()
+
+    def clear_proton(self):
+        """Clear Proton and use Wine default"""
+        self.proton_combo.setCurrentIndex(0)  # Select "Wine (default)"
+        self.selected_proton = None
         self.accept()
 
 
@@ -763,6 +775,7 @@ class GameItemWidget(QWidget):
     change_prefix_clicked = Signal(dict)
     rename_clicked = Signal(dict)
     proton_manager_clicked = Signal(dict)
+    prefix_manager_clicked = Signal(dict)
 
     def __init__(self, game: Dict[str, str], parent=None):
         super().__init__(parent)
@@ -794,6 +807,13 @@ class GameItemWidget(QWidget):
         layout.addLayout(info_layout, 1)
 
         # Buttons
+        wpm_btn = QPushButton("WPM")
+        wpm_btn.setMinimumHeight(28)
+        wpm_btn.setMaximumWidth(60)
+        wpm_btn.setToolTip("Wineprefix Manager (Winetricks)")
+        wpm_btn.clicked.connect(lambda: self.prefix_manager_clicked.emit(self.game))
+        layout.addWidget(wpm_btn)
+
         pmw_btn = QPushButton("PMW")
         pmw_btn.setMinimumHeight(28)
         pmw_btn.setMaximumWidth(60)
@@ -963,6 +983,7 @@ class GameLauncher(QMainWindow):
             game_widget.change_prefix_clicked.connect(self.change_game_prefix)
             game_widget.rename_clicked.connect(self.rename_game)
             game_widget.proton_manager_clicked.connect(self.open_proton_manager)
+            game_widget.prefix_manager_clicked.connect(self.open_prefix_manager)
             self.games_layout.insertWidget(self.games_layout.count(), game_widget)
             self.game_widgets.append(game_widget)
 
@@ -1043,8 +1064,9 @@ class GameLauncher(QMainWindow):
             for g in self.games:
                 if g["name"] == game["name"]:
                     if dialog.selected_proton is None:
-                        g["proton_version"] = "Wine (default)"
+                        g.pop("proton_version", None)
                         g.pop("proton_path", None)
+                        g.pop("proton_bin", None)
                         self.statusBar().showMessage(
                             f"Set {game['name']} to use Wine (default)"
                         )
@@ -1058,6 +1080,64 @@ class GameLauncher(QMainWindow):
                     self.save_games()
                     self.refresh_games_list()
                     break
+
+    def open_prefix_manager(self, game: Dict[str, str]):
+        """Open Winetricks for the game's prefix"""
+        prefix_path = game["prefix"]
+
+        if not os.path.exists(prefix_path):
+            QMessageBox.critical(
+                self, "Error", f"Wine prefix not found: {prefix_path}"
+            )
+            return
+
+        # Check if winetricks is installed
+        result = subprocess.run(
+            ["which", "winetricks"], capture_output=True, text=True
+        )
+
+        if result.returncode != 0:
+            QMessageBox.warning(
+                self,
+                "Winetricks Not Found",
+                "Winetricks is not installed or not found in PATH.\n\n"
+                "Please install winetricks to use this feature:\n"
+                "• Ubuntu/Debian: sudo apt install winetricks\n"
+                "• Arch: sudo pacman -S winetricks\n"
+                "• Fedora: sudo dnf install winetricks",
+            )
+            return
+
+        self.statusBar().showMessage(f"Launching Winetricks for {game['name']}...")
+
+        # Launch winetricks in a separate thread
+        def run_winetricks():
+            try:
+                env = os.environ.copy()
+                env["WINEPREFIX"] = prefix_path
+
+                process = subprocess.Popen(
+                    ["winetricks"], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
+
+                process.wait()
+
+                if process.returncode == 0:
+                    self.statusBar().showMessage(f"Winetricks closed for {game['name']}")
+                else:
+                    self.statusBar().showMessage(
+                        f"Winetricks exited with code {process.returncode} for {game['name']}"
+                    )
+
+            except Exception as e:
+                QMessageBox.critical(
+                    self, "Error", f"Failed to launch Winetricks: {str(e)}"
+                )
+                self.statusBar().showMessage("Failed to launch Winetricks")
+
+        import threading
+        thread = threading.Thread(target=run_winetricks, daemon=True)
+        thread.start()
 
     def check_wine_availability(self, output_window: GameOutputWindow):
         """Check if Wine is available and log version info"""
