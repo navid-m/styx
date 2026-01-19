@@ -31,6 +31,7 @@ data class PrefixInfo(
 class GameOutputWindow(private val gameName: String, parent: JFrame? = null) : JFrame("Game Output - $gameName") {
     private val outputText = JTextPane()
     private val verboseCheckbox = JCheckBox("Verbose Mode (show all Wine debug)", false)
+    private val maxLines = 10000
 
     init {
         initUI()
@@ -83,23 +84,33 @@ class GameOutputWindow(private val gameName: String, parent: JFrame? = null) : J
     }
 
     fun appendOutput(text: String, color: String? = null) {
-        val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
-        val doc = outputText.styledDocument
-        val style = outputText.addStyle("Style", null)
+        SwingUtilities.invokeLater {
+            val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
+            val doc = outputText.styledDocument
+            val style = outputText.addStyle("Style", null)
 
-        if (color != null) {
-            javax.swing.text.StyleConstants.setForeground(style, Color.decode(color))
-        } else {
-            javax.swing.text.StyleConstants.setForeground(style, Color.BLACK)
+            if (color != null) {
+                javax.swing.text.StyleConstants.setForeground(style, Color.decode(color))
+            } else {
+                javax.swing.text.StyleConstants.setForeground(style, Color.BLACK)
+            }
+
+            try {
+                doc.insertString(doc.length, "[$timestamp] $text\n", style)
+              
+                val root = doc.defaultRootElement
+                val lineCount = root.elementCount
+                if (lineCount > maxLines) {
+                    val linesToRemove = lineCount - maxLines
+                    val endOffset = root.getElement(linesToRemove).startOffset
+                    doc.remove(0, endOffset)
+                }
+                
+                outputText.caretPosition = doc.length
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
-
-        try {
-            doc.insertString(doc.length, "[$timestamp] $text\n", style)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        outputText.caretPosition = doc.length
     }
 
     fun clearOutput() {
