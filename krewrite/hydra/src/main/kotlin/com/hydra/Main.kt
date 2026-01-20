@@ -1320,7 +1320,8 @@ class GameItemWidgetWithImage(
     private fun showStatsWindow() {
         val statsWindow = JDialog(SwingUtilities.getWindowAncestor(this) as? JFrame, "Stats - ${game.name}", false)
         statsWindow.defaultCloseOperation = JDialog.DISPOSE_ON_CLOSE
-        statsWindow.setSize(500, 400)
+        statsWindow.setSize(400, 400)
+        statsWindow.minimumSize = Dimension(400, 400)
         statsWindow.setLocationRelativeTo(this)
 
         val mainPanel = JPanel()
