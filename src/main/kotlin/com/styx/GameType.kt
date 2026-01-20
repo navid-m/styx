@@ -1,4 +1,4 @@
-package com.hydra
+package com.styx
 
 enum class GameType {
     WINDOWS,

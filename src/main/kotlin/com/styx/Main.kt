@@ -1,4 +1,4 @@
-package com.hydra
+package com.styx
 
 import java.awt.*
 import java.awt.image.BufferedImage
@@ -1789,7 +1789,7 @@ class GameItemWidgetWithImage(
 
     private fun copyImageToConfigDir(sourceFile: File): String? {
         try {
-            val configDir = Paths.get(System.getProperty("user.home"), ".config", "hydra").toFile()
+            val configDir = Paths.get(System.getProperty("user.home"), ".config", "Styx").toFile()
             configDir.mkdirs()
 
             val artDir = File(configDir, "art")
@@ -1831,10 +1831,10 @@ fun formatTimePlayed(minutes: Long): String {
     }
 }
 
-class GameLauncher : JFrame("Hydra") {
+class GameLauncher : JFrame("Styx") {
     private val games = mutableListOf<Game>()
     private var availablePrefixes = listOf<PrefixInfo>()
-    private val configFile = Paths.get(System.getProperty("user.home"), ".config", "hydra", "games.json")
+    private val configFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "games.json")
     private val gameProcesses = mutableMapOf<String, Process>()
     private val outputWindows = mutableMapOf<String, GameOutputWindow>()
     private val gamesContainer = JPanel()
@@ -2155,7 +2155,7 @@ class GameLauncher : JFrame("Hydra") {
 
     private fun copyImageToConfigDir(game: Game, sourceFile: File): String? {
         try {
-            val configDir = Paths.get(System.getProperty("user.home"), ".config", "hydra").toFile()
+            val configDir = Paths.get(System.getProperty("user.home"), ".config", "styx").toFile()
             configDir.mkdirs()
 
             val artDir = File(configDir, "art")

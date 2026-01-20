@@ -1,4 +1,4 @@
-package com.hydra
+package com.styx
 
 data class Game(
     var name: String,

@@ -3,12 +3,12 @@
 
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.hydra</groupId>
-    <artifactId>hydra</artifactId>
+    <groupId>com.styx</groupId>
+    <artifactId>styx</artifactId>
     <version>0.0.1</version>
     <packaging>jar</packaging>
 
-    <name>com.hydra hydra</name>
+    <name>com.styx</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -91,7 +91,7 @@
                     <createDependencyReducedPom>true</createDependencyReducedPom>
                     <transformers>
                       <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                        <mainClass>com.hydra.MainKt</mainClass>
+                        <mainClass>com.styx.MainKt</mainClass>
                       </transformer>
                     </transformers>
                   </configuration>

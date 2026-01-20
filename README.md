@@ -1,4 +1,4 @@
-# Hydra
+# Styx
 
 Game launcher for playing Windows games on Linux, intended as an alternative to Lutris.
 
