@@ -818,10 +818,10 @@ class LaunchOptionsDialog(
     }
 
     private fun loadExistingOptions() {
+        launchOptions.clear()
         game.launchOptions.forEach { (key, value) ->
             tableModel.addRow(arrayOf(key, value))
-        } ?: run {
-            game.launchOptions = mutableMapOf()
+            launchOptions[key] = value
         }
     }
 
@@ -1512,7 +1512,6 @@ class GameLauncher : JFrame("Hydra") {
                 processBuilder.command("winetricks")
 
                 val process = processBuilder.start()
-
                 val exitCode = process.waitFor()
 
                 SwingUtilities.invokeLater {
@@ -1538,20 +1537,19 @@ class GameLauncher : JFrame("Hydra") {
     }
 
     private fun openLaunchOptions(game: Game) {
-        if (game.launchOptions == null) {
-            game.launchOptions = mutableMapOf()
-        }
-
-        val dialog = LaunchOptionsDialog(game, this)
-        dialog.isVisible = true
-
         val gameInList = games.find { it.name == game.name }
+
         if (gameInList != null) {
             if (gameInList.launchOptions == null) {
                 gameInList.launchOptions = mutableMapOf()
             }
+
+            val dialog = LaunchOptionsDialog(gameInList, this)
+            dialog.isVisible = true
+
             gameInList.launchOptions.clear()
             gameInList.launchOptions.putAll(dialog.launchOptions)
+
             saveGames()
             statusLabel.text = "Updated launch options for ${game.name}"
         }
