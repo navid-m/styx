@@ -24,7 +24,9 @@ data class Game(
     var protonBin: String? = null,
     var launchOptions: MutableMap<String, String> = mutableMapOf(),
     var imagePath: String? = null,
-    var timePlayed: Long = 0
+    var timePlayed: Long = 0,
+    var timesOpened: Int = 0,
+    var timesCrashed: Int = 0
 )
 
 data class PrefixInfo(
@@ -1220,6 +1222,12 @@ class GameItemWidgetWithImage(
     private fun setupContextMenu() {
         val popupMenu = JPopupMenu()
 
+        val statsItem = JMenuItem("Stats").apply {
+            addActionListener {
+                showStatsWindow()
+            }
+        }
+
         val openGameLocationItem = JMenuItem("Open game location").apply {
             addActionListener {
                 openGameLocation()
@@ -1232,6 +1240,8 @@ class GameItemWidgetWithImage(
             }
         }
 
+        popupMenu.add(statsItem)
+        popupMenu.addSeparator()
         popupMenu.add(openGameLocationItem)
         popupMenu.add(openPrefixLocationItem)
 
@@ -1305,6 +1315,94 @@ class GameItemWidgetWithImage(
                 JOptionPane.ERROR_MESSAGE
             )
         }
+    }
+
+    private fun showStatsWindow() {
+        val statsWindow = JDialog(SwingUtilities.getWindowAncestor(this) as? JFrame, "Stats - ${game.name}", false)
+        statsWindow.defaultCloseOperation = JDialog.DISPOSE_ON_CLOSE
+        statsWindow.setSize(500, 400)
+        statsWindow.setLocationRelativeTo(this)
+
+        val mainPanel = JPanel()
+        mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
+        mainPanel.border = EmptyBorder(20, 20, 20, 20)
+
+        val titleLabel = JLabel("Statistics for ${game.name}")
+        titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
+        titleLabel.alignmentX = Component.LEFT_ALIGNMENT
+        mainPanel.add(titleLabel)
+        mainPanel.add(Box.createVerticalStrut(20))
+
+        fun addStatRow(label: String, value: String) {
+            val panel = JPanel()
+            panel.layout = BoxLayout(panel, BoxLayout.X_AXIS)
+            panel.alignmentX = Component.LEFT_ALIGNMENT
+            panel.maximumSize = Dimension(Int.MAX_VALUE, 30)
+
+            val labelComp = JLabel(label)
+            labelComp.font = labelComp.font.deriveFont(Font.PLAIN, 14f)
+            panel.add(labelComp)
+            panel.add(Box.createHorizontalGlue())
+
+            val valueComp = JLabel(value)
+            valueComp.font = valueComp.font.deriveFont(Font.BOLD, 14f)
+            panel.add(valueComp)
+
+            mainPanel.add(panel)
+            mainPanel.add(Box.createVerticalStrut(10))
+        }
+
+        addStatRow("Time Played:", formatTimePlayed(game.timePlayed))
+        addStatRow("Times Opened:", game.timesOpened.toString())
+        addStatRow("Times Crashed:", game.timesCrashed.toString())
+
+        val gameSize = calculateDirectorySize(File(game.executable).parentFile)
+        addStatRow("Game Size:", formatFileSize(gameSize))
+
+        val prefixSize = calculateDirectorySize(File(game.prefix))
+        addStatRow("Wine Prefix Size:", formatFileSize(prefixSize))
+
+        mainPanel.add(Box.createVerticalGlue())
+
+        val closeButton = JButton("Close")
+        closeButton.alignmentX = Component.CENTER_ALIGNMENT
+        closeButton.addActionListener { statsWindow.dispose() }
+        mainPanel.add(closeButton)
+
+        statsWindow.contentPane.add(mainPanel)
+        statsWindow.isVisible = true
+    }
+
+    private fun calculateDirectorySize(directory: File?): Long {
+        if (directory == null || !directory.exists()) return 0L
+
+        var size = 0L
+        try {
+            Files.walk(directory.toPath()).use { stream ->
+                stream.forEach { path ->
+                    try {
+                        if (Files.isRegularFile(path)) {
+                            size += Files.size(path)
+                        }
+                    } catch (e: Exception) {
+                        // Skip files that can't be accessed
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return size
+    }
+
+    private fun formatFileSize(bytes: Long): String {
+        if (bytes < 1024) return "$bytes B"
+        val kb = bytes / 1024.0
+        if (kb < 1024) return "%.2f KB".format(kb)
+        val mb = kb / 1024.0
+        if (mb < 1024) return "%.2f MB".format(mb)
+        val gb = mb / 1024.0
+        return "%.2f GB".format(gb)
     }
 
     private fun updateArtFromGameDirectory() {
@@ -1975,6 +2073,11 @@ class GameLauncher : JFrame("Hydra") {
 
             gameStartTimes[gameName] = System.currentTimeMillis()
 
+            games.find { it.name == gameName }?.let { game ->
+                game.timesOpened++
+                saveGames()
+            }
+
             statusLabel.text = "$gameName is running (PID: $pid)"
             refreshGamesList()
 
@@ -2060,6 +2163,9 @@ class GameLauncher : JFrame("Hydra") {
 
                             games.find { it.name == gameName }?.let { game ->
                                 game.timePlayed += sessionMinutes
+                                if (exitCode != 0) {
+                                    game.timesCrashed++
+                                }
                                 saveGames()
                             }
 
