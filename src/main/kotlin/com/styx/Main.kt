@@ -276,9 +276,9 @@ class GameOutputWindow(
         val topPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 5))
         topPanel.add(verboseCheckbox)
         topPanel.add(hideDebugCheckbox)
-        hideDebugCheckbox.addActionListener { 
+        hideDebugCheckbox.addActionListener {
             needsUIUpdate = true
-            updateUI() 
+            updateUI()
         }
         contentPanel.add(topPanel, BorderLayout.NORTH)
         outputText.isEditable = false
@@ -357,7 +357,7 @@ class GameOutputWindow(
             } else {
                 displayBuffer.takeLast(maxDisplayLines)
             }
-            
+
             val text = linesToDisplay.joinToString("\n")
 
             SwingUtilities.invokeLater {
@@ -374,11 +374,11 @@ class GameOutputWindow(
     private fun isDebugLine(line: String): Boolean {
         val lowerLine = line.lowercase()
         return lowerLine.contains("fixme:") ||
-               lowerLine.contains("warn:") ||
-               lowerLine.contains("err:") ||
-               lowerLine.contains("trace:") ||
-               (lowerLine.contains("[warn]") && !lowerLine.contains("protonfixes")) ||
-               (lowerLine.contains("[err]") && !lowerLine.contains("version mismatch"))
+                lowerLine.contains("warn:") ||
+                lowerLine.contains("err:") ||
+                lowerLine.contains("trace:") ||
+                (lowerLine.contains("[warn]") && !lowerLine.contains("protonfixes")) ||
+                (lowerLine.contains("[err]") && !lowerLine.contains("version mismatch"))
     }
 
     fun appendOutput(text: String, color: String? = null) {
@@ -900,40 +900,41 @@ class GameConfigDialog(
 
     private fun initUI() {
         minimumSize = Dimension(450, 400)
-        
+
         val mainPanel = JPanel()
         mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
         mainPanel.border = EmptyBorder(15, 15, 15, 15)
-        
+
         val titleLabel = JLabel("Game Configuration")
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
         titleLabel.alignmentX = Component.LEFT_ALIGNMENT
         mainPanel.add(titleLabel)
         mainPanel.add(Box.createVerticalStrut(15))
-        
+
         val loggingPanel = JPanel()
         loggingPanel.layout = BoxLayout(loggingPanel, BoxLayout.Y_AXIS)
         loggingPanel.border = BorderFactory.createTitledBorder("Logging Options")
         loggingPanel.alignmentX = Component.LEFT_ALIGNMENT
-        
+
         verboseCheckbox.alignmentX = Component.LEFT_ALIGNMENT
         verboseCheckbox.toolTipText = "When enabled, shows all Wine debug output for this game"
         loggingPanel.add(verboseCheckbox)
         loggingPanel.add(Box.createVerticalStrut(5))
-        
-        val loggingInfoLabel = JLabel("<html><small>Verbose logging can help diagnose issues but generates a lot of output</small></html>")
+
+        val loggingInfoLabel =
+            JLabel("<html><small>Verbose logging can help diagnose issues but generates a lot of output</small></html>")
         loggingInfoLabel.foreground = Color(0x88, 0x88, 0x88)
         loggingInfoLabel.alignmentX = Component.LEFT_ALIGNMENT
         loggingPanel.add(loggingInfoLabel)
-        
+
         mainPanel.add(loggingPanel)
         mainPanel.add(Box.createVerticalStrut(15))
-        
+
         val actionsPanel = JPanel()
         actionsPanel.layout = BoxLayout(actionsPanel, BoxLayout.Y_AXIS)
         actionsPanel.border = BorderFactory.createTitledBorder("Configuration Actions")
         actionsPanel.alignmentX = Component.LEFT_ALIGNMENT
-        
+
         val paramsBtn = JButton("Launch Parameters...").apply {
             maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
             alignmentX = Component.LEFT_ALIGNMENT
@@ -944,7 +945,7 @@ class GameConfigDialog(
         }
         actionsPanel.add(paramsBtn)
         actionsPanel.add(Box.createVerticalStrut(8))
-        
+
         val winetricksBtn = JButton("Winetricks...").apply {
             maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
             alignmentX = Component.LEFT_ALIGNMENT
@@ -955,7 +956,7 @@ class GameConfigDialog(
         }
         actionsPanel.add(winetricksBtn)
         actionsPanel.add(Box.createVerticalStrut(8))
-        
+
         val protonBtn = JButton("Proton Manager...").apply {
             maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
             alignmentX = Component.LEFT_ALIGNMENT
@@ -966,7 +967,7 @@ class GameConfigDialog(
         }
         actionsPanel.add(protonBtn)
         actionsPanel.add(Box.createVerticalStrut(8))
-        
+
         val changePrefixBtn = JButton("Change Wineprefix...").apply {
             maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
             alignmentX = Component.LEFT_ALIGNMENT
@@ -979,11 +980,11 @@ class GameConfigDialog(
         actionsPanel.add(changePrefixBtn)
         mainPanel.add(actionsPanel)
         mainPanel.add(Box.createVerticalGlue())
-        
+
         val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
         buttonPanel.alignmentX = Component.LEFT_ALIGNMENT
         buttonPanel.maximumSize = Dimension(Short.MAX_VALUE.toInt(), 40)
-        
+
         val saveBtn = JButton("Save").apply {
             preferredSize = Dimension(80, 32)
             addActionListener {
@@ -991,18 +992,18 @@ class GameConfigDialog(
                 dispose()
             }
         }
-        
+
         val cancelBtn = JButton("Cancel").apply {
             preferredSize = Dimension(80, 32)
             addActionListener { dispose() }
         }
-        
+
         buttonPanel.add(saveBtn)
         buttonPanel.add(cancelBtn)
-        
+
         mainPanel.add(Box.createVerticalStrut(10))
         mainPanel.add(buttonPanel)
-        
+
         contentPane = mainPanel
         pack()
         setLocationRelativeTo(parent)
@@ -2143,7 +2144,7 @@ class GameItemWidgetWithImage(
         table.setEnabled(false)
         table.background = Color(45, 45, 48)
         table.foreground = Color.WHITE
-        
+
         val tableHeader = table.tableHeader
         tableHeader.background = Color(34, 35, 36)
         tableHeader.foreground = Color.WHITE
