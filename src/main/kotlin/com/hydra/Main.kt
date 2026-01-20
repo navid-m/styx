@@ -1019,6 +1019,195 @@ class AddGameDialog(
     }
 }
 
+class AddNativeGameDialog(parent: JFrame) : JDialog(parent, "Add Native Linux Game", true) {
+
+    private val nameInput = JTextField(30)
+    private val exeInput = JTextField(30)
+    var gameData: Game? = null
+
+    init {
+        initUI()
+    }
+
+    private fun initUI() {
+        minimumSize = Dimension(500, 180)
+
+        val mainPanel = JPanel()
+        mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
+        mainPanel.border = EmptyBorder(10, 10, 10, 10)
+
+        val namePanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
+        val nameLabel = JLabel("Game Name:")
+        nameLabel.preferredSize = Dimension(100, 25)
+        namePanel.add(nameLabel)
+        namePanel.add(nameInput)
+        mainPanel.add(namePanel)
+
+        val exePanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
+        val exeLabel = JLabel("Executable:")
+        exeLabel.preferredSize = Dimension(100, 25)
+        exePanel.add(exeLabel)
+        exePanel.add(exeInput)
+        val browseBtn = JButton("Browse...").apply {
+            preferredSize = Dimension(100, 28)
+            addActionListener { browseExecutable() }
+        }
+        exePanel.add(browseBtn)
+        mainPanel.add(exePanel)
+
+        mainPanel.add(Box.createVerticalStrut(10))
+
+        val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
+
+        val okBtn = JButton("Add").apply {
+            preferredSize = Dimension(80, 32)
+            addActionListener { acceptGame() }
+        }
+
+        val cancelBtn = JButton("Cancel").apply {
+            preferredSize = Dimension(80, 32)
+            addActionListener { dispose() }
+        }
+
+        buttonPanel.add(okBtn)
+        buttonPanel.add(cancelBtn)
+        mainPanel.add(buttonPanel)
+
+        contentPane = mainPanel
+        pack()
+        setLocationRelativeTo(parent)
+    }
+
+    private fun browseExecutable() {
+        val chooser = JFileChooser()
+        chooser.dialogTitle = "Select Native Linux Executable"
+        chooser.fileSelectionMode = JFileChooser.FILES_ONLY
+
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            exeInput.text = chooser.selectedFile.absolutePath
+            if (nameInput.text.isEmpty()) {
+                nameInput.text = chooser.selectedFile.nameWithoutExtension
+            }
+        }
+    }
+
+    private fun acceptGame() {
+        val name = nameInput.text.trim()
+        val exePath = exeInput.text.trim()
+
+        if (name.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Enter a game name.", "Invalid Input", JOptionPane.WARNING_MESSAGE)
+            return
+        }
+
+        if (exePath.isEmpty() || !File(exePath).exists()) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Select a valid executable.",
+                "Invalid Input",
+                JOptionPane.WARNING_MESSAGE
+            )
+            return
+        }
+
+        gameData = Game(name, exePath, "", type = GameType.NATIVE_LINUX)
+        dispose()
+    }
+}
+
+class AddSteamGameDialog(parent: JFrame) : JDialog(parent, "Add Steam Game", true) {
+
+    private val nameInput = JTextField(30)
+    private val steamIdInput = JTextField(30)
+    var gameData: Game? = null
+
+    init {
+        initUI()
+    }
+
+    private fun initUI() {
+        minimumSize = Dimension(500, 180)
+
+        val mainPanel = JPanel()
+        mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
+        mainPanel.border = EmptyBorder(10, 10, 10, 10)
+
+        val namePanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
+        val nameLabel = JLabel("Game Name:")
+        nameLabel.preferredSize = Dimension(100, 25)
+        namePanel.add(nameLabel)
+        namePanel.add(nameInput)
+        mainPanel.add(namePanel)
+
+        val steamIdPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
+        val steamIdLabel = JLabel("Steam App ID:")
+        steamIdLabel.preferredSize = Dimension(100, 25)
+        steamIdPanel.add(steamIdLabel)
+        steamIdPanel.add(steamIdInput)
+        mainPanel.add(steamIdPanel)
+
+        val helpLabel = JLabel("<html><i>Example: For Counter-Strike 2, use 730</i></html>")
+        helpLabel.font = helpLabel.font.deriveFont(10f)
+        helpLabel.border = EmptyBorder(0, 110, 5, 0)
+        mainPanel.add(helpLabel)
+
+        mainPanel.add(Box.createVerticalStrut(10))
+
+        val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
+
+        val okBtn = JButton("Add").apply {
+            preferredSize = Dimension(80, 32)
+            addActionListener { acceptGame() }
+        }
+
+        val cancelBtn = JButton("Cancel").apply {
+            preferredSize = Dimension(80, 32)
+            addActionListener { dispose() }
+        }
+
+        buttonPanel.add(okBtn)
+        buttonPanel.add(cancelBtn)
+        mainPanel.add(buttonPanel)
+
+        contentPane = mainPanel
+        pack()
+        setLocationRelativeTo(parent)
+    }
+
+    private fun acceptGame() {
+        val name = nameInput.text.trim()
+        val steamAppId = steamIdInput.text.trim()
+
+        if (name.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Enter a game name.", "Invalid Input", JOptionPane.WARNING_MESSAGE)
+            return
+        }
+
+        if (steamAppId.isEmpty()) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Enter a valid Steam App ID.",
+                "Invalid Input",
+                JOptionPane.WARNING_MESSAGE
+            )
+            return
+        }
+
+        if (!steamAppId.all { it.isDigit() }) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Steam App ID must be numeric.",
+                "Invalid Input",
+                JOptionPane.WARNING_MESSAGE
+            )
+            return
+        }
+
+        gameData = Game(name, steamAppId, "", type = GameType.STEAM)
+        dispose()
+    }
+}
+
 class GameItemWidgetWithImage(
     private val game: Game,
     private val onLaunch: (Game) -> Unit,
@@ -1062,11 +1251,24 @@ class GameItemWidgetWithImage(
         nameLabel.foreground = Color.WHITE
         infoPanel.add(nameLabel)
 
-        val number = Regex("/(\\d+)/").find(game.prefix)?.groupValues?.get(1)
-        val prefixLabel = JLabel("Prefix: ${number}")
-        prefixLabel.font = prefixLabel.font.deriveFont(11f)
-        prefixLabel.foreground = Color.LIGHT_GRAY
-        infoPanel.add(prefixLabel)
+        val typeOrPrefixLabel: JLabel = when (game.getGameType()) {
+            GameType.NATIVE_LINUX -> JLabel("Type: Native Linux").apply {
+                font = font.deriveFont(11f)
+                foreground = Color(100, 200, 255)
+            }
+            GameType.STEAM -> JLabel("Type: Steam").apply {
+                font = font.deriveFont(11f)
+                foreground = Color(102, 153, 255)
+            }
+            GameType.WINDOWS -> {
+                val number = Regex("/(\\d+)/").find(game.prefix)?.groupValues?.get(1)
+                JLabel("Prefix: ${number}").apply {
+                    font = font.deriveFont(11f)
+                    foreground = Color.LIGHT_GRAY
+                }
+            }
+        }
+        infoPanel.add(typeOrPrefixLabel)
 
         val statusLabel = if (isGamePlaying(game)) {
             JLabel("▶ Playing").apply {
@@ -1084,40 +1286,42 @@ class GameItemWidgetWithImage(
         add(infoPanel)
         add(Box.createHorizontalGlue())
 
-        val loBtn = JButton("Params").apply {
-            preferredSize = Dimension(100, 28)
-            maximumSize = Dimension(100, 28)
-            toolTipText = "Launch Options"
-            addActionListener { onLaunchOptions(game) }
-        }
-        add(loBtn)
-        add(Box.createHorizontalStrut(5))
+        if (game.getGameType() == GameType.WINDOWS) {
+            val loBtn = JButton("Params").apply {
+                preferredSize = Dimension(100, 28)
+                maximumSize = Dimension(100, 28)
+                toolTipText = "Launch Options"
+                addActionListener { onLaunchOptions(game) }
+            }
+            add(loBtn)
+            add(Box.createHorizontalStrut(5))
 
-        val wpmBtn = JButton("Winetricks").apply {
-            preferredSize = Dimension(100, 28)
-            maximumSize = Dimension(100, 28)
-            toolTipText = "Wineprefix Manager (Winetricks)"
-            addActionListener { onPrefixManager(game) }
-        }
-        add(wpmBtn)
-        add(Box.createHorizontalStrut(5))
+            val wpmBtn = JButton("Winetricks").apply {
+                preferredSize = Dimension(100, 28)
+                maximumSize = Dimension(100, 28)
+                toolTipText = "Wineprefix Manager (Winetricks)"
+                addActionListener { onPrefixManager(game) }
+            }
+            add(wpmBtn)
+            add(Box.createHorizontalStrut(5))
 
-        val pmwBtn = JButton("Proton").apply {
-            preferredSize = Dimension(90, 28)
-            maximumSize = Dimension(90, 28)
-            toolTipText = "Proton Manager Window"
-            addActionListener { onProtonManager(game) }
-        }
-        add(pmwBtn)
-        add(Box.createHorizontalStrut(5))
+            val pmwBtn = JButton("Proton").apply {
+                preferredSize = Dimension(90, 28)
+                maximumSize = Dimension(90, 28)
+                toolTipText = "Proton Manager Window"
+                addActionListener { onProtonManager(game) }
+            }
+            add(pmwBtn)
+            add(Box.createHorizontalStrut(5))
 
-        val changePrefixBtn = JButton("Change Prefix").apply {
-            preferredSize = Dimension(120, 28)
-            maximumSize = Dimension(120, 28)
-            addActionListener { onChangePrefix(game) }
+            val changePrefixBtn = JButton("Change Prefix").apply {
+                preferredSize = Dimension(120, 28)
+                maximumSize = Dimension(120, 28)
+                addActionListener { onChangePrefix(game) }
+            }
+            add(changePrefixBtn)
+            add(Box.createHorizontalStrut(5))
         }
-        add(changePrefixBtn)
-        add(Box.createHorizontalStrut(5))
 
         val launchBtn = JButton("Launch").apply {
             preferredSize = Dimension(100, 28)
@@ -1225,17 +1429,29 @@ class GameItemWidgetWithImage(
             }
         }
 
-        val openPrefixLocationItem = JMenuItem("Open wine prefix location").apply {
-            addActionListener {
-                openPrefixLocation()
-            }
-        }
-
         popupMenu.add(statsItem)
         popupMenu.add(renameItem)
         popupMenu.addSeparator()
         popupMenu.add(openGameLocationItem)
-        popupMenu.add(openPrefixLocationItem)
+
+        if (game.getGameType() == GameType.WINDOWS) {
+            val openPrefixLocationItem = JMenuItem("Open wine prefix location").apply {
+                addActionListener {
+                    openPrefixLocation()
+                }
+            }
+            popupMenu.add(openPrefixLocationItem)
+        }
+
+        if (game.getGameType() == GameType.NATIVE_LINUX || game.getGameType() == GameType.STEAM) {
+            popupMenu.addSeparator()
+            val reconfigureItem = JMenuItem("Reconfigure").apply {
+                addActionListener {
+                    reconfigureGame()
+                }
+            }
+            popupMenu.add(reconfigureItem)
+        }
 
         addMouseListener(object : java.awt.event.MouseAdapter() {
             override fun mousePressed(e: java.awt.event.MouseEvent) {
@@ -1253,6 +1469,16 @@ class GameItemWidgetWithImage(
     }
 
     private fun openGameLocation() {
+        if (game.getGameType() == GameType.STEAM) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Steam App ID: ${game.executable}\nThis game is launched via Steam.",
+                "Steam Game Info",
+                JOptionPane.INFORMATION_MESSAGE
+            )
+            return
+        }
+
         val gameFile = File(game.executable)
         val gameDirectory = gameFile.parentFile
 
@@ -1323,6 +1549,61 @@ class GameItemWidgetWithImage(
         if (newName != null && newName.isNotBlank() && newName != game.name) {
             game.name = newName
             onRename(game)
+        }
+    }
+
+    private fun reconfigureGame() {
+        when (game.getGameType()) {
+            GameType.NATIVE_LINUX -> {
+                val fileChooser = JFileChooser()
+                fileChooser.dialogTitle = "Select Native Linux Executable"
+                fileChooser.fileSelectionMode = JFileChooser.FILES_ONLY
+                fileChooser.currentDirectory = File(game.executable).parentFile
+
+                if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+                    val newExecutable = fileChooser.selectedFile.absolutePath
+                    val field = game::class.java.getDeclaredField("executable")
+                    field.isAccessible = true
+                    field.set(game, newExecutable)
+                    onSaveGames()
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "Native Linux executable updated to:\n$newExecutable",
+                        "Reconfigured",
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                }
+            }
+            GameType.STEAM -> {
+                val newSteamId = JOptionPane.showInputDialog(
+                    this,
+                    "Enter Steam App ID for '${game.name}':",
+                    "Reconfigure Steam Game",
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    null,
+                    game.executable
+                ) as? String
+
+                if (newSteamId != null && newSteamId.isNotBlank()) {
+                    val field = game::class.java.getDeclaredField("executable")
+                    field.isAccessible = true
+                    field.set(game, newSteamId)
+                    onSaveGames()
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "Steam App ID updated to: $newSteamId",
+                        "Reconfigured",
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                }
+            }
+            GameType.WINDOWS -> {
+                // Should NEVER happen.
+            }
+            null -> {
+
+            }
         }
     }
 
@@ -1532,20 +1813,20 @@ class GameItemWidgetWithImage(
             return null
         }
     }
+}
 
-    private fun formatTimePlayed(minutes: Long): String {
-        return if (minutes == 0L) {
-            "Not yet played"
-        } else if (minutes < 60) {
-            "Played: ${minutes}m"
+fun formatTimePlayed(minutes: Long): String {
+    return if (minutes == 0L) {
+        "Not yet played"
+    } else if (minutes < 60) {
+        "Played: ${minutes}m"
+    } else {
+        val hours = minutes / 60
+        val mins = minutes % 60
+        if (mins == 0L) {
+            "Played: ${hours}h"
         } else {
-            val hours = minutes / 60
-            val mins = minutes % 60
-            if (mins == 0L) {
-                "Played: ${hours}h"
-            } else {
-                "Played: ${hours}h ${mins}m"
-            }
+            "Played: ${hours}h ${mins}m"
         }
     }
 }
@@ -1655,12 +1936,27 @@ class GameLauncher : JFrame("Hydra") {
 
         val rightButtonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
 
-        val addBtn = JButton("Add Game").apply {
+        val addNativeBtn = JButton("Add Native").apply {
             preferredSize = Dimension(120, 32)
-            font = font.deriveFont(Font.BOLD)
+            toolTipText = "Add Native Linux Game"
+            addActionListener { addNativeGame() }
+        }
+
+        val addSteamBtn = JButton("Add Steam").apply {
+            preferredSize = Dimension(120, 32)
+            toolTipText = "Add Steam Game"
+            addActionListener { addSteamGame() }
+        }
+
+        val addBtn = JButton("Add Windows").apply {
+            preferredSize = Dimension(140, 32)
+            font = font.deriveFont(Font.PLAIN)
+            toolTipText = "Add Windows Game (Wine/Proton)"
             addActionListener { addGame() }
         }
 
+        rightButtonPanel.add(addNativeBtn)
+        rightButtonPanel.add(addSteamBtn)
         rightButtonPanel.add(addBtn)
 
         buttonRowPanel.add(leftButtonPanel, BorderLayout.WEST)
@@ -1701,6 +1997,13 @@ class GameLauncher : JFrame("Hydra") {
                 val type = object : TypeToken<List<Game>>() {}.type
                 games.clear()
                 val loadedGames: List<Game> = gson.fromJson(json, type)
+                
+                loadedGames.forEach { game ->
+                    if (game.getGameType() == null) {
+                        game.type = GameType.WINDOWS
+                    }
+                }
+                
                 games.addAll(loadedGames)
                 refreshGamesList()
             } catch (e: Exception) {
@@ -1792,7 +2095,37 @@ class GameLauncher : JFrame("Hydra") {
         }
     }
 
+    private fun addNativeGame() {
+        val dialog = AddNativeGameDialog(this)
+        dialog.isVisible = true
+
+        dialog.gameData?.let { newGame ->
+            autoSetGameImage(newGame)
+            games.add(newGame)
+            saveGames()
+            refreshGamesList()
+            statusLabel.text = "Added native Linux game: ${newGame.name}"
+        }
+    }
+
+    private fun addSteamGame() {
+        val dialog = AddSteamGameDialog(this)
+        dialog.isVisible = true
+
+        dialog.gameData?.let { newGame ->
+            autoSetGameImage(newGame)
+            games.add(newGame)
+            saveGames()
+            refreshGamesList()
+            statusLabel.text = "Added Steam game: ${newGame.name}"
+        }
+    }
+
     private fun autoSetGameImage(game: Game) {
+        if (game.getGameType() == GameType.STEAM) {
+            return
+        }
+
         val gameDir = File(game.executable).parentFile
         if (gameDir != null && gameDir.exists()) {
             val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "bmp", "webp")
@@ -2042,7 +2375,182 @@ class GameLauncher : JFrame("Hydra") {
         }
     }
 
+    private fun launchNativeLinuxGame(game: Game) {
+        val exePath = game.executable
+        val gameName = game.name
+
+        if (!File(exePath).exists()) {
+            JOptionPane.showMessageDialog(this, "Executable not found: $exePath", "Error", JOptionPane.ERROR_MESSAGE)
+            return
+        }
+
+        val outputWindow = GameOutputWindow(gameName, this) { abortGameName ->
+            abortGameLaunch(abortGameName)
+        }
+        outputWindows[gameName] = outputWindow
+        outputWindow.isVisible = true
+
+        outputWindow.appendOutput("═".repeat(60), "#0066cc")
+        outputWindow.appendOutput("LAUNCHING NATIVE LINUX GAME: $gameName", "#0066cc")
+        outputWindow.appendOutput("═".repeat(60), "#0066cc")
+        outputWindow.appendOutput("")
+
+        outputWindow.appendOutput("=== Launch Configuration ===", "#0066cc")
+        outputWindow.appendOutput("Executable: $exePath")
+        outputWindow.appendOutput("Working Directory: ${File(exePath).parent}")
+        outputWindow.appendOutput("Type: Native Linux Binary", "#00aa00")
+        outputWindow.appendOutput("")
+
+        try {
+            val processBuilder = ProcessBuilder()
+            processBuilder.directory(File(exePath).parentFile)
+            processBuilder.command(File(exePath).absolutePath)
+
+            outputWindow.appendOutput("=== Starting Native Process ===", "#0066cc")
+            outputWindow.appendOutput("Command: ${File(exePath).absolutePath}")
+            outputWindow.appendOutput("")
+
+            val process = processBuilder.start()
+            gameProcesses[gameName] = process
+
+            game.timesOpened++
+            val startTime = System.currentTimeMillis()
+
+            Thread {
+                val stdout = process.inputStream.bufferedReader()
+                val stderr = process.errorStream.bufferedReader()
+
+                Thread {
+                    try {
+                        stdout.lines().forEach { line ->
+                            outputWindow.appendOutput(line)
+                        }
+                    } catch (e: Exception) {
+                        // Stream closed. Ignore.
+                    }
+                }.start()
+
+                Thread {
+                    try {
+                        stderr.lines().forEach { line ->
+                            outputWindow.appendOutput(line, "#cc6600")
+                        }
+                    } catch (e: Exception) {
+                        // Stream closed. Ignore.
+                    }
+                }.start()
+
+                val exitCode = process.waitFor()
+                val endTime = System.currentTimeMillis()
+                val duration = endTime - startTime
+                game.timePlayed += duration
+
+                gameProcesses.remove(gameName)
+
+                SwingUtilities.invokeLater {
+                    outputWindow.appendOutput("")
+                    outputWindow.appendOutput("═".repeat(60), "#0066cc")
+                    if (exitCode == 0) {
+                        outputWindow.appendOutput("GAME EXITED NORMALLY", "#00aa00")
+                    } else {
+                        outputWindow.appendOutput("GAME CRASHED (Exit code: $exitCode)", "#cc0000")
+                        game.timesCrashed++
+                    }
+                    outputWindow.appendOutput("Session Duration: ${formatTimePlayed(duration)}", "#0066cc")
+                    outputWindow.appendOutput("═".repeat(60), "#0066cc")
+                    saveGames()
+                    refreshGamesList()
+                }
+            }.start()
+
+            statusLabel.text = "Launched ${game.name}"
+            refreshGamesList()
+
+        } catch (e: Exception) {
+            outputWindow.appendOutput("ERROR: ${e.message}", "#cc0000")
+            e.printStackTrace()
+            game.timesCrashed++
+            gameProcesses.remove(gameName)
+            saveGames()
+            refreshGamesList()
+        }
+    }
+
+    private fun launchSteamGame(game: Game) {
+        val steamAppId = game.executable
+        val gameName = game.name
+
+        val outputWindow = GameOutputWindow(gameName, this) { abortGameName ->
+            abortGameLaunch(abortGameName)
+        }
+        outputWindows[gameName] = outputWindow
+        outputWindow.isVisible = true
+
+        outputWindow.appendOutput("═".repeat(60), "#0066cc")
+        outputWindow.appendOutput("LAUNCHING STEAM GAME: $gameName", "#0066cc")
+        outputWindow.appendOutput("═".repeat(60), "#0066cc")
+        outputWindow.appendOutput("")
+
+        outputWindow.appendOutput("=== Launch Configuration ===", "#0066cc")
+        outputWindow.appendOutput("Steam App ID: $steamAppId")
+        outputWindow.appendOutput("Type: Steam Game", "#00aa00")
+        outputWindow.appendOutput("")
+
+        try {
+            val steamUrl = "steam://rungameid/$steamAppId"
+            outputWindow.appendOutput("=== Starting Steam ===", "#0066cc")
+            outputWindow.appendOutput("Opening: $steamUrl")
+            outputWindow.appendOutput("")
+
+            val processBuilder = ProcessBuilder("xdg-open", steamUrl)
+            val process = processBuilder.start()
+            
+            game.timesOpened++
+            val startTime = System.currentTimeMillis()
+            
+            Thread {
+                process.waitFor()
+                
+                SwingUtilities.invokeLater {
+                    outputWindow.appendOutput("")
+                    outputWindow.appendOutput("═".repeat(60), "#0066cc")
+                    outputWindow.appendOutput("Steam launcher opened successfully", "#00aa00")
+                    outputWindow.appendOutput("Note: Game will launch through Steam client", "#0066cc")
+                    outputWindow.appendOutput("═".repeat(60), "#0066cc")
+                    saveGames()
+                }
+            }.start()
+
+            statusLabel.text = "Launched ${game.name} via Steam"
+            refreshGamesList()
+
+        } catch (e: Exception) {
+            outputWindow.appendOutput("ERROR: ${e.message}", "#cc0000")
+            e.printStackTrace()
+            game.timesCrashed++
+            saveGames()
+            refreshGamesList()
+        }
+    }
+
     private fun launchGame(game: Game) {
+        when (game.getGameType()) {
+            GameType.NATIVE_LINUX -> {
+                launchNativeLinuxGame(game)
+                return
+            }
+            GameType.STEAM -> {
+                launchSteamGame(game)
+                return
+            }
+            GameType.WINDOWS -> {
+                // Continue with Wine/Proton launch...
+            }
+            null -> {
+
+            }
+        }
+
         val exePath = game.executable
         val prefixPath = game.prefix
         val gameName = game.name
