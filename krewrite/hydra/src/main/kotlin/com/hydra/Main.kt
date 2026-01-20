@@ -1052,7 +1052,7 @@ class GameItemWidget(
             LineBorder(Color(0xCC, 0xCC, 0xCC), 1, true),
             EmptyBorder(5, 5, 5, 5)
         )
-        background = Color(0xF9, 0xF9, 0xF9)
+        background = Color(0x00, 0x00, 0x00)
 
         val infoPanel = JPanel()
         infoPanel.layout = BoxLayout(infoPanel, BoxLayout.Y_AXIS)
@@ -1060,12 +1060,12 @@ class GameItemWidget(
 
         val nameLabel = JLabel(game.name)
         nameLabel.font = nameLabel.font.deriveFont(Font.BOLD, 10f)
-        nameLabel.foreground = Color.BLACK
+        nameLabel.foreground = Color.WHITE
         infoPanel.add(nameLabel)
 
         val prefixLabel = JLabel("Prefix: ${Paths.get(game.prefix).fileName}")
         prefixLabel.font = prefixLabel.font.deriveFont(8f)
-        prefixLabel.foreground = Color(0x66, 0x66, 0x66)
+        prefixLabel.foreground = Color.LIGHT_GRAY
         infoPanel.add(prefixLabel)
 
         add(infoPanel)
