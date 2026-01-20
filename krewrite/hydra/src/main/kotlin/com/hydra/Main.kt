@@ -1346,7 +1346,7 @@ class GameItemWidgetWithImage(
 
             val valueComp = JLabel(value)
             valueComp.font = valueComp.font.deriveFont(Font.BOLD, 14f)
-            panel.add(valueComp, BorderLayout.EAST)
+            panel.add(valueComp, BorderLayout.CENTER)
 
             mainPanel.add(panel)
             mainPanel.add(Box.createVerticalStrut(10))
