@@ -1765,10 +1765,66 @@ class GameLauncher : JFrame("Hydra") {
         dialog.isVisible = true
 
         dialog.gameData?.let { newGame ->
+            autoSetGameImage(newGame)
             games.add(newGame)
             saveGames()
             refreshGamesList()
             statusLabel.text = "Added ${newGame.name}"
+        }
+    }
+
+    private fun autoSetGameImage(game: Game) {
+        val gameDir = File(game.executable).parentFile
+        if (gameDir != null && gameDir.exists()) {
+            val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "bmp", "webp")
+            val imageFiles = mutableListOf<File>()
+
+            fun searchImages(dir: File) {
+                dir.listFiles()?.forEach { file ->
+                    if (file.isDirectory) {
+                        searchImages(file)
+                    } else if (file.extension.lowercase() in imageExtensions) {
+                        imageFiles.add(file)
+                    }
+                }
+            }
+
+            searchImages(gameDir)
+
+            if (imageFiles.isNotEmpty()) {
+                val firstImage = imageFiles.first()
+                val copiedImagePath = copyImageToConfigDir(game, firstImage)
+                if (copiedImagePath != null) {
+                    game.imagePath = copiedImagePath
+                }
+            }
+        }
+    }
+
+    private fun copyImageToConfigDir(game: Game, sourceFile: File): String? {
+        try {
+            val configDir = Paths.get(System.getProperty("user.home"), ".config", "hydra").toFile()
+            configDir.mkdirs()
+
+            val artDir = File(configDir, "art")
+            artDir.mkdirs()
+
+            val gameSafeName = game.name.replace(Regex("[^a-zA-Z0-9.-]"), "_")
+            val extension = sourceFile.extension
+            val targetFileName = "${gameSafeName}_${
+                sourceFile.nameWithoutExtension.substring(
+                    0,
+                    kotlin.math.min(20, sourceFile.nameWithoutExtension.length)
+                )
+            }.$extension"
+            val targetFile = File(artDir, targetFileName)
+
+            sourceFile.copyTo(targetFile, overwrite = true)
+
+            return targetFile.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
         }
     }
 
