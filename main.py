@@ -876,13 +876,94 @@ class GameItemWidget(QWidget):
         self.customContextMenuRequested.connect(self.show_context_menu)
 
     def show_context_menu(self, position):
-        """Show context menu with 'Update Art' option"""
+        """Show context menu with 'Update Art', 'Open game folder', and 'Open wine prefix location' options"""
         menu = QMenu(self)
 
         update_art_action = menu.addAction("Update Art")
         update_art_action.triggered.connect(self.update_game_art)
 
+        menu.addSeparator()
+
+        open_game_folder_action = menu.addAction("Open game folder")
+        open_game_folder_action.triggered.connect(self.open_game_folder)
+
+        open_prefix_location_action = menu.addAction("Open wine prefix location")
+        open_prefix_location_action.triggered.connect(self.open_wine_prefix_location)
+
         menu.exec(self.mapToGlobal(position))
+
+    def open_game_folder(self):
+        """Open the game's executable folder"""
+        game_exe_path = Path(self.game["executable"])
+        game_folder = game_exe_path.parent
+
+        if game_folder.exists():
+            try:
+                # Determine the OS and open the folder appropriately
+                import platform
+                system = platform.system()
+
+                if system == "Linux":
+                    subprocess.run(["xdg-open", str(game_folder)])
+                elif system == "Darwin":  # macOS
+                    subprocess.run(["open", str(game_folder)])
+                elif system == "Windows":
+                    subprocess.run(["explorer", str(game_folder)])
+                else:
+                    # Fallback: show a message if the system isn't recognized
+                    QMessageBox.information(
+                        self,
+                        "Open Game Folder",
+                        f"Game folder: {game_folder}"
+                    )
+            except Exception as e:
+                QMessageBox.warning(
+                    self,
+                    "Error",
+                    f"Failed to open game folder: {str(e)}"
+                )
+        else:
+            QMessageBox.warning(
+                self,
+                "Error",
+                f"Game folder does not exist: {game_folder}"
+            )
+
+    def open_wine_prefix_location(self):
+        """Open the wine prefix location"""
+        prefix_path = Path(self.game["prefix"])
+
+        if prefix_path.exists():
+            try:
+                # Determine the OS and open the folder appropriately
+                import platform
+                system = platform.system()
+
+                if system == "Linux":
+                    subprocess.run(["xdg-open", str(prefix_path)])
+                elif system == "Darwin":  # macOS
+                    subprocess.run(["open", str(prefix_path)])
+                elif system == "Windows":
+                    subprocess.run(["explorer", str(prefix_path)])
+                else:
+                    # Fallback: show a message if the system isn't recognized
+                    QMessageBox.information(
+                        self,
+                        "Open Wine Prefix Location",
+                        f"Wine prefix: {prefix_path}"
+                    )
+            except Exception as e:
+                QMessageBox.warning(
+                    self,
+                    "Error",
+                    f"Failed to open wine prefix location: {str(e)}"
+                )
+        else:
+            QMessageBox.warning(
+                self,
+                "Error",
+                f"Wine prefix does not exist: {prefix_path}"
+            )
 
     def load_game_art(self):
         """Load game art from local file if available"""
