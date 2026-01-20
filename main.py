@@ -27,8 +27,8 @@ from PySide6.QtWidgets import (
     QSizePolicy,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QProcess, QTimer
-from PySide6.QtGui import QFont, QTextCursor, QPixmap
-import requests
+from PySide6.QtGui import QFont, QColor, QTextCursor, QPixmap, QIcon
+import shutil
 
 
 class GameOutputWindow(QMainWindow):
@@ -911,22 +911,16 @@ class GameItemWidget(QWidget):
         self.image_label.setPixmap(pixmap)
 
     def update_game_art(self):
-        """Download and update game art from online sources"""
+        """Find and update game art from local game folder"""
         game_name = self.game["name"]
 
         msg_box = QMessageBox()
         msg_box.setWindowTitle("Updating Art")
-        msg_box.setText(f"Searching for art for '{game_name}'...")
+        msg_box.setText(f"Searching for art in game folder for '{game_name}'...")
         msg_box.setStandardButtons(QMessageBox.StandardButton.Cancel)
         msg_box.show()
 
-        success = self.download_art_from_unsplash(game_name)
-
-        if not success:
-            success = self.download_art_from_pexels(game_name)
-
-        if not success:
-            success = self.download_art_from_pixabay(game_name)
+        success = self.find_local_art(game_name)
 
         if success:
             msg_box.close()
@@ -935,53 +929,54 @@ class GameItemWidget(QWidget):
         else:
             msg_box.close()
             QMessageBox.warning(
-                self, "Warning", f"Could not find art for '{game_name}'."
+                self, "Warning", f"No art found in game folder for '{game_name}'."
             )
 
-    def download_art_from_unsplash(self, game_name):
-        """Download game art from Unsplash"""
+    def find_local_art(self, game_name):
+        """Find local art in the game's folder"""
         try:
-            search_query = f"{game_name.replace(' ', '+')}+game"
-            url = f"https://source.unsplash.com/featured/?{search_query}"
+            # Get the game executable's directory
+            game_exe_path = Path(self.game["executable"])
+            game_dir = game_exe_path.parent
 
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                self.save_game_art(response.content, game_name)
-                return True
+            # Define image file extensions to look for
+            image_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp'}
+
+            # Walk through the game directory recursively
+            for root, dirs, files in os.walk(game_dir):
+                for file in files:
+                    file_ext = Path(file).suffix.lower()
+                    if file_ext in image_extensions:
+                        image_path = Path(root) / file
+
+                        # Copy the image to the art directory
+                        self.save_local_image_as_game_art(image_path, game_name)
+                        return True
+
         except Exception as e:
-            print(f"Error downloading from Unsplash: {e}")
+            print(f"Error finding local art: {e}")
 
         return False
 
-    def download_art_from_pexels(self, game_name):
-        """Download game art from Pexels (using their sample API)"""
+    def save_local_image_as_game_art(self, image_path, game_name):
+        """Copy local image to the art directory as game art"""
         try:
-            search_query = game_name.replace(" ", "%20")
-            url = f"https://picsum.photos/300/200?random={hash(game_name) % 10000}"
+            art_dir = Path.home() / ".config" / "hydra" / "art"
+            art_dir.mkdir(parents=True, exist_ok=True)
 
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                self.save_game_art(response.content, game_name)
-                return True
+            clean_name = "".join(
+                c for c in game_name if c.isalnum() or c in (" ", "-", "_")
+            ).rstrip()
+
+            # Preserve the original extension
+            file_extension = image_path.suffix
+            file_path = art_dir / f"{clean_name}{file_extension}"
+
+            # Copy the image file to the art directory
+            shutil.copy2(image_path, file_path)
+
         except Exception as e:
-            print(f"Error downloading from Pexels: {e}")
-
-        return False
-
-    def download_art_from_pixabay(self, game_name):
-        """Download game art from Pixabay (using their sample API)"""
-        try:
-            search_query = game_name.replace(" ", "%20")
-            url = f"https://picsum.photos/300/200?random={hash(game_name) % 10000 + 10000}"
-
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                self.save_game_art(response.content, game_name)
-                return True
-        except Exception as e:
-            print(f"Error downloading from Pixabay: {e}")
-
-        return False
+            print(f"Error copying game art: {e}")
 
     def save_game_art(self, image_data, game_name):
         """Save game art to local file"""
