@@ -2001,10 +2001,6 @@ class GameLauncher : JFrame("Hydra") {
         val gameInList = games.find { it.name == game.name }
 
         if (gameInList != null) {
-            if (gameInList.launchOptions == null) {
-                gameInList.launchOptions = mutableMapOf()
-            }
-
             val dialog = LaunchOptionsDialog(gameInList, this)
             dialog.isVisible = true
 
