@@ -826,7 +826,6 @@ class GameItemWidget(QWidget):
 
         layout.addLayout(info_layout, 1)
 
-        # Buttons
         wpm_btn = QPushButton("Winetricks")
         wpm_btn.setMinimumHeight(28)
         wpm_btn.setMaximumWidth(80)
@@ -884,6 +883,11 @@ class GameItemWidget(QWidget):
 
         menu.addSeparator()
 
+        choose_image_action = menu.addAction("Choose Image...")
+        choose_image_action.triggered.connect(self.choose_image)
+
+        menu.addSeparator()
+
         open_game_folder_action = menu.addAction("Open game folder")
         open_game_folder_action.triggered.connect(self.open_game_folder)
 
@@ -924,13 +928,47 @@ class GameItemWidget(QWidget):
                 self, "Error", f"Game folder does not exist: {game_folder}"
             )
 
+    def choose_image(self):
+        """Allow user to manually select an image file for the game"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Game Image",
+            "",
+            "Image Files (*.png *.jpg *.jpeg *.gif *.bmp *.tiff *.webp);;All Files (*)",
+        )
+
+        if file_path:
+            try:
+                selected_image_path = Path(file_path)
+                game_name = self.game["name"]
+
+                art_dir = Path.home() / ".config" / "hydra" / "art"
+                art_dir.mkdir(parents=True, exist_ok=True)
+
+                clean_name = "".join(
+                    c for c in game_name if c.isalnum() or c in (" ", "-", "_")
+                ).rstrip()
+
+                file_extension = selected_image_path.suffix
+                destination_path = art_dir / f"{clean_name}{file_extension}"
+
+                shutil.copy2(selected_image_path, destination_path)
+
+                print(f"DEBUG: About to reload game art after choosing image")
+                self.load_game_art()
+
+                QMessageBox.information(
+                    self, "Success", f"Image set for '{game_name}'!"
+                )
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Failed to set image: {str(e)}")
+
     def open_wine_prefix_location(self):
         """Open the wine prefix location"""
         prefix_path = Path(self.game["prefix"])
 
         if prefix_path.exists():
             try:
-                # Determine the OS and open the folder appropriately
                 import platform
 
                 system = platform.system()
@@ -942,7 +980,6 @@ class GameItemWidget(QWidget):
                 elif system == "Windows":
                     subprocess.run(["explorer", str(prefix_path)])
                 else:
-                    # Fallback: show a message if the system isn't recognized
                     QMessageBox.information(
                         self, "Open Wine Prefix Location", f"Wine prefix: {prefix_path}"
                     )
@@ -960,26 +997,53 @@ class GameItemWidget(QWidget):
         pixmap = QPixmap(60, 60)
         pixmap.fill(Qt.GlobalColor.lightGray)
 
+        print(f"DEBUG: Loading art for game: {self.game['name']}")
         game_name_clean = "".join(
             c for c in self.game["name"] if c.isalnum() or c in (" ", "-", "_")
         ).rstrip()
-        art_file_path = (
-            Path.home() / ".config" / "hydra" / "art" / f"{game_name_clean}.png"
-        )
 
-        if art_file_path.exists():
-            loaded_pixmap = QPixmap(str(art_file_path))
-            if not loaded_pixmap.isNull():
-                # Scale the image to fit while maintaining aspect ratio
-                scaled_pixmap = loaded_pixmap.scaled(
-                    60,
-                    60,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-                pixmap = scaled_pixmap
+        print(f"DEBUG: Looking for art with name: {game_name_clean}")
 
+        art_dir = Path.home() / ".config" / "hydra" / "art"
+        print(f"DEBUG: Art directory: {art_dir}, exists: {art_dir.exists()}")
+
+        if art_dir.exists():
+            print(f"DEBUG: Contents of art directory: {[str(f) for f in art_dir.iterdir()]}")
+            for file_path in art_dir.iterdir():
+                print(f"DEBUG: Checking file: {file_path}, stem: {file_path.stem}, is_file: {file_path.is_file()}")
+                if file_path.is_file() and file_path.stem == game_name_clean:
+                    print(f"DEBUG: Found matching file: {file_path}")
+                    if file_path.suffix.lower() in [
+                        ".png",
+                        ".jpg",
+                        ".jpeg",
+                        ".gif",
+                        ".bmp",
+                        ".tiff",
+                        ".webp",
+                    ]:
+                        print(f"DEBUG: Loading image from: {file_path}")
+                        loaded_pixmap = QPixmap(str(file_path))
+                        print(f"DEBUG: Loaded pixmap is null: {loaded_pixmap.isNull()}, size: {loaded_pixmap.size()}")
+                        if not loaded_pixmap.isNull():
+                            scaled_pixmap = loaded_pixmap.scaled(
+                                60,
+                                60,
+                                Qt.AspectRatioMode.KeepAspectRatio,
+                                Qt.TransformationMode.SmoothTransformation,
+                            )
+                            pixmap = scaled_pixmap
+                            print(f"DEBUG: Successfully set scaled pixmap")
+                        break
+                    else:
+                        print(f"DEBUG: File {file_path} has unsupported extension: {file_path.suffix.lower()}")
+
+        print(f"DEBUG: Setting pixmap to image label")
         self.image_label.setPixmap(pixmap)
+        # Force the UI to update
+        self.image_label.repaint()
+        self.repaint()
+        print(f"DEBUG: Finished loading art")
 
     def update_game_art(self):
         """Find and update game art from local game folder"""
@@ -1006,11 +1070,8 @@ class GameItemWidget(QWidget):
     def find_local_art(self, game_name):
         """Find local art in the game's folder"""
         try:
-            # Get the game executable's directory
             game_exe_path = Path(self.game["executable"])
             game_dir = game_exe_path.parent
-
-            # Define image file extensions to look for
             image_extensions = {
                 ".png",
                 ".jpg",
@@ -1020,15 +1081,12 @@ class GameItemWidget(QWidget):
                 ".tiff",
                 ".webp",
             }
-
-            # Walk through the game directory recursively
             for root, dirs, files in os.walk(game_dir):
                 for file in files:
                     file_ext = Path(file).suffix.lower()
                     if file_ext in image_extensions:
                         image_path = Path(root) / file
 
-                        # Copy the image to the art directory
                         self.save_local_image_as_game_art(image_path, game_name)
                         return True
 
@@ -1047,11 +1105,9 @@ class GameItemWidget(QWidget):
                 c for c in game_name if c.isalnum() or c in (" ", "-", "_")
             ).rstrip()
 
-            # Preserve the original extension
             file_extension = image_path.suffix
             file_path = art_dir / f"{clean_name}{file_extension}"
 
-            # Copy the image file to the art directory
             shutil.copy2(image_path, file_path)
 
         except Exception as e:
@@ -1312,7 +1368,6 @@ class GameLauncher(QMainWindow):
             QMessageBox.critical(self, "Error", f"Wine prefix not found: {prefix_path}")
             return
 
-        # Check if winetricks is installed
         result = subprocess.run(["which", "winetricks"], capture_output=True, text=True)
 
         if result.returncode != 0:
