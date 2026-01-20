@@ -513,7 +513,6 @@ class ProtonManagerDialog(
     private val game: Game,
     parent: JFrame
 ) : JDialog(parent, "Proton Manager - ${game.name}", true) {
-
     private val protonCombo = JComboBox<ProtonComboItem>()
     private val customPathInput = JTextField(30)
     private val availableProtons = mutableListOf<ProtonInfo>()
