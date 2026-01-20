@@ -1582,27 +1582,29 @@ class GameLauncher : JFrame("Hydra") {
         mainPanel.border = EmptyBorder(10, 10, 10, 10)
 
         val topPanel = JPanel(BorderLayout(10, 5))
-        
+
         val titleLabel = JLabel("Library")
         titleLabel.font = titleLabel.font.deriveFont(Font.PLAIN, 18f)
         topPanel.add(titleLabel, BorderLayout.NORTH)
-        
+
         val searchPanel = JPanel(BorderLayout(5, 0))
         searchField.preferredSize = Dimension(300, 30)
         searchPanel.add(searchField, BorderLayout.CENTER)
-        
+
         searchField.document.addDocumentListener(object : javax.swing.event.DocumentListener {
             override fun insertUpdate(e: javax.swing.event.DocumentEvent?) {
                 filterGames()
             }
+
             override fun removeUpdate(e: javax.swing.event.DocumentEvent?) {
                 filterGames()
             }
+
             override fun changedUpdate(e: javax.swing.event.DocumentEvent?) {
                 filterGames()
             }
         })
-        
+
         topPanel.add(searchPanel, BorderLayout.SOUTH)
         mainPanel.add(topPanel, BorderLayout.NORTH)
 
