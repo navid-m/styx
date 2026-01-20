@@ -1581,6 +1581,16 @@ class GameLauncher : JFrame("Hydra") {
         minimumSize = Dimension(900, 600)
         defaultCloseOperation = DO_NOTHING_ON_CLOSE
 
+        try {
+            val iconUrl = javaClass.getResource("/icon.jpg")
+            if (iconUrl != null) {
+                val iconImage = javax.imageio.ImageIO.read(iconUrl)
+                setIconImage(iconImage)
+            }
+        } catch (e: Exception) {
+            System.err.println("Failed to load application icon: ${e.message}")
+        }
+
         addWindowListener(object : java.awt.event.WindowAdapter() {
             override fun windowClosing(e: java.awt.event.WindowEvent?) {
                 handleApplicationClose()
