@@ -1216,7 +1216,8 @@ class GameItemWidgetWithImage(
     private val onChangePrefix: (Game) -> Unit,
     private val onProtonManager: (Game) -> Unit,
     private val onPrefixManager: (Game) -> Unit,
-    private val onLaunchOptions: (Game) -> Unit
+    private val onLaunchOptions: (Game) -> Unit,
+    private val onSaveGames: () -> Unit
 ) : JPanel() {
 
     private val imageLabel = JLabel()
@@ -1311,12 +1312,20 @@ class GameItemWidgetWithImage(
             if (imageFile.exists()) {
                 try {
                     val bufferedImage = javax.imageio.ImageIO.read(imageFile)
-                    val scaledImage = bufferedImage.getScaledInstance(60, 60, Image.SCALE_SMOOTH)
-                    imageLabel.icon = ImageIcon(scaledImage)
+                    if (bufferedImage != null) {
+                        val scaledImage = bufferedImage.getScaledInstance(60, 60, Image.SCALE_SMOOTH)
+                        imageLabel.icon = ImageIcon(scaledImage)
+                    } else {
+                        println("ImageIO.read returned null for: ${imageFile.absolutePath}")
+                        imageLabel.icon = createPlaceholderIcon()
+                    }
                 } catch (e: Exception) {
+                    println("Error loading image: ${e.message}")
+                    e.printStackTrace()
                     imageLabel.icon = createPlaceholderIcon()
                 }
             } else {
+                println("Image file does not exist: ${imageFile.absolutePath}")
                 imageLabel.icon = createPlaceholderIcon()
             }
         } else {
@@ -1480,14 +1489,25 @@ class GameItemWidgetWithImage(
 
             if (imageFiles.isNotEmpty()) {
                 val firstImage = imageFiles.first()
-                game.imagePath = firstImage.absolutePath
-                updateImage()
-                JOptionPane.showMessageDialog(
-                    this,
-                    "Updated art to: ${firstImage.name}",
-                    "Art Updated",
-                    JOptionPane.INFORMATION_MESSAGE
-                )
+                val copiedImagePath = copyImageToConfigDir(firstImage)
+                if (copiedImagePath != null) {
+                    game.imagePath = copiedImagePath
+                    updateImage()
+                    onSaveGames()
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "Updated art to: ${firstImage.name}",
+                        "Art Updated",
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                } else {
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "Failed to copy image to config directory.",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
             } else {
                 JOptionPane.showMessageDialog(
                     this,
@@ -1515,14 +1535,52 @@ class GameItemWidgetWithImage(
 
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             val selectedFile = chooser.selectedFile
-            game.imagePath = selectedFile.absolutePath
-            updateImage()
-            JOptionPane.showMessageDialog(
-                this,
-                "Updated art to: ${selectedFile.name}",
-                "Art Updated",
-                JOptionPane.INFORMATION_MESSAGE
-            )
+            val copiedImagePath = copyImageToConfigDir(selectedFile)
+            if (copiedImagePath != null) {
+                game.imagePath = copiedImagePath
+                updateImage()
+                onSaveGames()
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Updated art to: ${selectedFile.name}",
+                    "Art Updated",
+                    JOptionPane.INFORMATION_MESSAGE
+                )
+            } else {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to copy image to config directory.",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+                )
+            }
+        }
+    }
+
+    private fun copyImageToConfigDir(sourceFile: File): String? {
+        try {
+            val configDir = Paths.get(System.getProperty("user.home"), ".config", "hydra").toFile()
+            configDir.mkdirs()
+
+            val artDir = File(configDir, "art")
+            artDir.mkdirs()
+
+            val gameSafeName = game.name.replace(Regex("[^a-zA-Z0-9.-]"), "_")
+            val extension = sourceFile.extension
+            val targetFileName = "${gameSafeName}_${
+                sourceFile.nameWithoutExtension.substring(
+                    0,
+                    kotlin.math.min(20, sourceFile.nameWithoutExtension.length)
+                )
+            }.$extension"
+            val targetFile = File(artDir, targetFileName)
+
+            sourceFile.copyTo(targetFile, overwrite = true)
+
+            return targetFile.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
         }
     }
 }
@@ -1647,6 +1705,9 @@ class GameLauncher : JFrame("Hydra") {
                     if (game.launchOptions == null) {
                         game.launchOptions = mutableMapOf()
                     }
+                    if (game.imagePath == null) {
+                        game.imagePath = null
+                    }
                 }
                 games.addAll(loadedGames)
                 refreshGamesList()
@@ -1687,7 +1748,8 @@ class GameLauncher : JFrame("Hydra") {
                     ::changeGamePrefix,
                     ::openProtonManager,
                     ::openPrefixManager,
-                    ::openLaunchOptions
+                    ::openLaunchOptions,
+                    ::saveGames
                 )
             gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 70)
             gamesContainer.add(gameWidget)
