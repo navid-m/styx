@@ -1059,7 +1059,7 @@ class GameItemWidgetWithImage(
             LineBorder(Color(0xCC, 0xCC, 0xCC), 1, true),
             EmptyBorder(5, 5, 5, 5)
         )
-        background = Color(0x00, 0x00, 0x00)
+        background = Color(34, 35, 36)
 
         updateImage()
         imageLabel.preferredSize = Dimension(60, 60)
