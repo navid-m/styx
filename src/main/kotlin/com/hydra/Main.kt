@@ -954,6 +954,10 @@ class AddGameDialog(
     private fun browseExecutable() {
         val chooser = JFileChooser()
         chooser.dialogTitle = "Select Game Executable"
+        chooser.fileFilter = javax.swing.filechooser.FileNameExtensionFilter(
+            "Executable files (*.exe, *.cmd, *.bat, *.bin)",
+            "exe", "cmd", "bat", "bin"
+        )
 
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             exeInput.text = chooser.selectedFile.absolutePath
