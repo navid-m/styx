@@ -1589,6 +1589,7 @@ class GameLauncher : JFrame("Hydra") {
 
         val searchPanel = JPanel(BorderLayout(5, 0))
         searchField.preferredSize = Dimension(300, 30)
+        searchField.toolTipText = "Search library..."
         searchPanel.add(searchField, BorderLayout.CENTER)
 
         searchField.document.addDocumentListener(object : javax.swing.event.DocumentListener {
