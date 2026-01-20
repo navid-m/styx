@@ -1646,7 +1646,7 @@ class GameLauncher : JFrame("Hydra") {
         val rightButtonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
 
         val addBtn = JButton("Add Game").apply {
-            preferredSize = Dimension(150, 35)
+            preferredSize = Dimension(120, 32)
             font = font.deriveFont(Font.BOLD)
             addActionListener { addGame() }
         }
