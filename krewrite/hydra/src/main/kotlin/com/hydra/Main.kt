@@ -1669,9 +1669,7 @@ class GameLauncher : JFrame("Hydra") {
         val statusPanel = JPanel(BorderLayout())
         statusPanel.border = EmptyBorder(5, 10, 5, 10)
         statusPanel.add(statusLabel, BorderLayout.WEST)
-
         fullBottomPanel.add(statusPanel, BorderLayout.SOUTH)
-
         mainPanel.add(fullBottomPanel, BorderLayout.SOUTH)
 
         contentPane = mainPanel
