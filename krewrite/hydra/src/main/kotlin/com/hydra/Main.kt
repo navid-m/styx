@@ -16,7 +16,7 @@ import kotlin.io.path.*
 import com.formdev.flatlaf.themes.FlatMacDarkLaf
 
 data class Game(
-    val name: String,
+    var name: String,
     val executable: String,
     var prefix: String,
     var protonVersion: String? = null,
@@ -1043,7 +1043,8 @@ class GameItemWidgetWithImage(
     private val onPrefixManager: (Game) -> Unit,
     private val onLaunchOptions: (Game) -> Unit,
     private val onSaveGames: () -> Unit,
-    private val isGamePlaying: (Game) -> Boolean
+    private val isGamePlaying: (Game) -> Boolean,
+    private val onRename: (Game) -> Unit
 ) : JPanel() {
 
     private val imageLabel = JLabel()
@@ -1228,6 +1229,12 @@ class GameItemWidgetWithImage(
             }
         }
 
+        val renameItem = JMenuItem("Rename").apply {
+            addActionListener {
+                renameGame()
+            }
+        }
+
         val openGameLocationItem = JMenuItem("Open game location").apply {
             addActionListener {
                 openGameLocation()
@@ -1241,6 +1248,7 @@ class GameItemWidgetWithImage(
         }
 
         popupMenu.add(statsItem)
+        popupMenu.add(renameItem)
         popupMenu.addSeparator()
         popupMenu.add(openGameLocationItem)
         popupMenu.add(openPrefixLocationItem)
@@ -1314,6 +1322,23 @@ class GameItemWidgetWithImage(
                 "Error",
                 JOptionPane.ERROR_MESSAGE
             )
+        }
+    }
+
+    private fun renameGame() {
+        val newName = JOptionPane.showInputDialog(
+            this,
+            "Enter new name for '${game.name}':",
+            "Rename Game",
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            null,
+            game.name
+        ) as? String
+
+        if (newName != null && newName.isNotBlank() && newName != game.name) {
+            game.name = newName
+            onRename(game)
         }
     }
 
@@ -1739,7 +1764,8 @@ class GameLauncher : JFrame("Hydra") {
                     ::openPrefixManager,
                     ::openLaunchOptions,
                     ::saveGames,
-                    ::isGamePlaying
+                    ::isGamePlaying,
+                    ::renameGame
                 )
             gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 70)
             gamesContainer.add(gameWidget)
@@ -1749,6 +1775,11 @@ class GameLauncher : JFrame("Hydra") {
         gamesContainer.add(Box.createVerticalGlue())
         gamesContainer.revalidate()
         gamesContainer.repaint()
+    }
+
+    private fun renameGame(game: Game) {
+        saveGames()
+        refreshGamesList()
     }
 
     private fun filterGames() {
