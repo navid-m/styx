@@ -1040,7 +1040,8 @@ class GameItemWidgetWithImage(
     private val onProtonManager: (Game) -> Unit,
     private val onPrefixManager: (Game) -> Unit,
     private val onLaunchOptions: (Game) -> Unit,
-    private val onSaveGames: () -> Unit
+    private val onSaveGames: () -> Unit,
+    private val isGamePlaying: (Game) -> Boolean
 ) : JPanel() {
 
     private val imageLabel = JLabel()
@@ -1080,10 +1081,18 @@ class GameItemWidgetWithImage(
         prefixLabel.foreground = Color.LIGHT_GRAY
         infoPanel.add(prefixLabel)
 
-        val timePlayedLabel = JLabel(formatTimePlayed(game.timePlayed))
-        timePlayedLabel.font = timePlayedLabel.font.deriveFont(11f)
-        timePlayedLabel.foreground = Color(3, 252, 252)
-        infoPanel.add(timePlayedLabel)
+        val statusLabel = if (isGamePlaying(game)) {
+            JLabel("▶ Playing").apply {
+                foreground = Color(0, 255, 0)
+                font = font.deriveFont(Font.BOLD, 11f)
+            }
+        } else {
+            JLabel(formatTimePlayed(game.timePlayed)).apply {
+                foreground = Color(3, 252, 252)
+                font = font.deriveFont(11f)
+            }
+        }
+        infoPanel.add(statusLabel)
 
         add(infoPanel)
         add(Box.createHorizontalGlue())
@@ -1416,7 +1425,7 @@ class GameItemWidgetWithImage(
 
     private fun formatTimePlayed(minutes: Long): String {
         return if (minutes == 0L) {
-            "Not played yet"
+            "Not yet played"
         } else if (minutes < 60) {
             "Played: ${minutes}m"
         } else {
@@ -1593,7 +1602,8 @@ class GameLauncher : JFrame("Hydra") {
                     ::openProtonManager,
                     ::openPrefixManager,
                     ::openLaunchOptions,
-                    ::saveGames
+                    ::saveGames,
+                    ::isGamePlaying
                 )
             gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 70)
             gamesContainer.add(gameWidget)
@@ -1603,6 +1613,10 @@ class GameLauncher : JFrame("Hydra") {
         gamesContainer.add(Box.createVerticalGlue())
         gamesContainer.revalidate()
         gamesContainer.repaint()
+    }
+
+    private fun isGamePlaying(game: Game): Boolean {
+        return gameProcesses.containsKey(game.name)
     }
 
     private fun addGame() {
@@ -1962,6 +1976,7 @@ class GameLauncher : JFrame("Hydra") {
             gameStartTimes[gameName] = System.currentTimeMillis()
 
             statusLabel.text = "$gameName is running (PID: $pid)"
+            refreshGamesList()
 
             val stdoutThread = Thread {
                 try {
@@ -2037,20 +2052,20 @@ class GameLauncher : JFrame("Hydra") {
                 val exitCode = process.waitFor()
                 val startTime = gameStartTimes[gameName]
 
-                if (startTime != null) {
-                    val endTime = System.currentTimeMillis()
-                    val sessionMinutes = (endTime - startTime) / 1000 / 60
-
-                    games.find { it.name == gameName }?.let { game ->
-                        game.timePlayed += sessionMinutes
-                        saveGames()
-                    }
-
-                    gameStartTimes.remove(gameName)
-                }
-
                 if (!isShuttingDown) {
                     SwingUtilities.invokeLater {
+                        if (startTime != null) {
+                            val endTime = System.currentTimeMillis()
+                            val sessionMinutes = (endTime - startTime) / 1000 / 60
+
+                            games.find { it.name == gameName }?.let { game ->
+                                game.timePlayed += sessionMinutes
+                                saveGames()
+                            }
+
+                            gameStartTimes.remove(gameName)
+                        }
+
                         outputWindow.appendOutput("")
                         outputWindow.appendOutput("═".repeat(60), "#0066cc")
                         outputWindow.appendOutput("PROCESS FINISHED", "#0066cc")
