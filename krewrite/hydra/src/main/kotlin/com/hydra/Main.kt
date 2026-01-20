@@ -1638,7 +1638,6 @@ class GameLauncher : JFrame("Hydra") {
         val fullBottomPanel = JPanel(BorderLayout())
         val buttonRowPanel = JPanel(BorderLayout())
         val leftButtonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 8, 0))
-
         val removeBtn = JButton("Remove Game").apply {
             preferredSize = Dimension(120, 32)
             addActionListener { removeGame() }
