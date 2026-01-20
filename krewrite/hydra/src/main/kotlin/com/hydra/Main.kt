@@ -1247,12 +1247,13 @@ class GameItemWidgetWithImage(
         infoPanel.isOpaque = false
 
         val nameLabel = JLabel(game.name)
-        nameLabel.font = nameLabel.font.deriveFont(Font.BOLD, 10f)
+        nameLabel.font = nameLabel.font.deriveFont(Font.PLAIN, 14f)
         nameLabel.foreground = Color.WHITE
         infoPanel.add(nameLabel)
 
-        val prefixLabel = JLabel("Prefix: ${Paths.get(game.prefix).fileName}")
-        prefixLabel.font = prefixLabel.font.deriveFont(8f)
+        val number = Regex("/(\\d+)/").find(game.prefix)?.groupValues?.get(1)
+        val prefixLabel = JLabel("Prefix: ${number}")
+        prefixLabel.font = prefixLabel.font.deriveFont(11f)
         prefixLabel.foreground = Color.LIGHT_GRAY
         infoPanel.add(prefixLabel)
 
