@@ -2146,12 +2146,11 @@ class GameLauncher : JFrame("Hydra") {
                         it.key.startsWith("STEAM_COMPAT") ||
                         it.key.startsWith("DXVK") ||
                         it.key.startsWith("PROTON") ||
-                        it.key == "MANGOHUD" ||
-                        (game.launchOptions.containsKey(it.key) == true)
+                        it.key == "MANGOHUD" || game.launchOptions.containsKey(it.key)
             }.forEach { (key, value) ->
                 outputWindow.appendOutput("  $key=$value")
             }
-            if (game.launchOptions.isNotEmpty() == true) {
+            if (game.launchOptions.isNotEmpty()) {
                 outputWindow.appendOutput(
                     "Custom launch options: ${game.launchOptions.size ?: 0} variable(s)",
                     "#00aa00"
