@@ -23,7 +23,8 @@ data class Game(
     var protonPath: String? = null,
     var protonBin: String? = null,
     var launchOptions: MutableMap<String, String> = mutableMapOf(),
-    var imagePath: String? = null
+    var imagePath: String? = null,
+    var timePlayed: Long = 0
 )
 
 data class PrefixInfo(
@@ -436,19 +437,17 @@ class ChangePrefixDialog(
             preferredSize = Dimension(100, 28)
             addActionListener { browsePrefix() }
         }
-        prefixPanel.add(browseBtn)
 
+        prefixPanel.add(browseBtn)
         newGroup.add(prefixPanel)
         mainPanel.add(newGroup)
         mainPanel.add(Box.createVerticalStrut(10))
 
         val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
-
         val okBtn = JButton("Change Prefix").apply {
             preferredSize = Dimension(120, 32)
             addActionListener { acceptChange() }
         }
-
         val cancelBtn = JButton("Cancel").apply {
             preferredSize = Dimension(80, 32)
             addActionListener { dispose() }
@@ -456,7 +455,6 @@ class ChangePrefixDialog(
 
         buttonPanel.add(okBtn)
         buttonPanel.add(cancelBtn)
-
         mainPanel.add(buttonPanel)
 
         contentPane = mainPanel
@@ -1082,6 +1080,11 @@ class GameItemWidgetWithImage(
         prefixLabel.foreground = Color.LIGHT_GRAY
         infoPanel.add(prefixLabel)
 
+        val timePlayedLabel = JLabel(formatTimePlayed(game.timePlayed))
+        timePlayedLabel.font = timePlayedLabel.font.deriveFont(11f)
+        timePlayedLabel.foreground = Color(3, 252, 252)
+        infoPanel.add(timePlayedLabel)
+
         add(infoPanel)
         add(Box.createHorizontalGlue())
 
@@ -1410,6 +1413,22 @@ class GameItemWidgetWithImage(
             return null
         }
     }
+
+    private fun formatTimePlayed(minutes: Long): String {
+        return if (minutes == 0L) {
+            "Not played yet"
+        } else if (minutes < 60) {
+            "Played: ${minutes}m"
+        } else {
+            val hours = minutes / 60
+            val mins = minutes % 60
+            if (mins == 0L) {
+                "Played: ${hours}h"
+            } else {
+                "Played: ${hours}h ${mins}m"
+            }
+        }
+    }
 }
 
 class GameLauncher : JFrame("Hydra") {
@@ -1421,6 +1440,7 @@ class GameLauncher : JFrame("Hydra") {
     private val gamesContainer = JPanel()
     private val statusLabel = JLabel("Ready")
     private val logReaderThreads = mutableListOf<Thread>()
+    private val gameStartTimes = mutableMapOf<String, Long>()
 
     @Volatile
     private var isShuttingDown = false
@@ -1939,6 +1959,8 @@ class GameLauncher : JFrame("Hydra") {
             outputWindow.appendOutput("─".repeat(60))
             outputWindow.appendOutput("")
 
+            gameStartTimes[gameName] = System.currentTimeMillis()
+
             statusLabel.text = "$gameName is running (PID: $pid)"
 
             val stdoutThread = Thread {
@@ -2013,6 +2035,19 @@ class GameLauncher : JFrame("Hydra") {
             logReaderThreads.add(stderrThread)
             val monitorThread = Thread {
                 val exitCode = process.waitFor()
+                val startTime = gameStartTimes[gameName]
+
+                if (startTime != null) {
+                    val endTime = System.currentTimeMillis()
+                    val sessionMinutes = (endTime - startTime) / 1000 / 60
+
+                    games.find { it.name == gameName }?.let { game ->
+                        game.timePlayed += sessionMinutes
+                        saveGames()
+                    }
+
+                    gameStartTimes.remove(gameName)
+                }
 
                 if (!isShuttingDown) {
                     SwingUtilities.invokeLater {
@@ -2035,6 +2070,7 @@ class GameLauncher : JFrame("Hydra") {
                         gameProcesses.remove(gameName)
                         logReaderThreads.removeAll { !it.isAlive }
                         statusLabel.text = "$gameName exited (code: $exitCode)"
+                        refreshGamesList()
                     }
                 }
             }.apply {
@@ -2094,9 +2130,23 @@ class GameLauncher : JFrame("Hydra") {
                 outputWindow?.appendOutput("Process terminated.", "#cc0000")
                 outputWindow?.disableAbortButton()
 
+                val startTime = gameStartTimes[gameName]
+                if (startTime != null) {
+                    val endTime = System.currentTimeMillis()
+                    val sessionMinutes = (endTime - startTime) / 1000 / 60
+
+                    games.find { it.name == gameName }?.let { game ->
+                        game.timePlayed += sessionMinutes
+                        saveGames()
+                    }
+
+                    gameStartTimes.remove(gameName)
+                }
+
                 gameProcesses.remove(gameName)
                 logReaderThreads.removeAll { !it.isAlive }
                 statusLabel.text = "Aborted launch of $gameName"
+                refreshGamesList()
             }
         } else {
             JOptionPane.showMessageDialog(
