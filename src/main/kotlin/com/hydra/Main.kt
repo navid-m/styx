@@ -1056,7 +1056,7 @@ class GameItemWidgetWithImage(
     private fun initUI() {
         layout = BoxLayout(this, BoxLayout.X_AXIS)
         border = BorderFactory.createCompoundBorder(
-            LineBorder(Color.GRAY, 2, true),
+            LineBorder(Color.GRAY, 1, true),
             EmptyBorder(5, 5, 5, 5)
         )
         background = Color(34, 35, 36)
