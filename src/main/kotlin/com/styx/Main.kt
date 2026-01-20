@@ -239,6 +239,7 @@ class GameOutputWindow(
 ) : JFrame("Game Output - $gameName") {
     private val outputText = JTextArea()
     private val verboseCheckbox = JCheckBox("Verbose Mode (show all Wine debug)", false)
+    private val hideDebugCheckbox = JCheckBox("Hide Wine debug output", false)
     private val abortBtn = JButton("Abort Launch")
     private val maxDisplayLines = 5000
     private val fullLogBuffer = mutableListOf<String>()
@@ -272,8 +273,13 @@ class GameOutputWindow(
 
         contentPanel.add(titleLabel, BorderLayout.NORTH)
 
-        val topPanel = JPanel(BorderLayout())
-        topPanel.add(verboseCheckbox, BorderLayout.WEST)
+        val topPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 5))
+        topPanel.add(verboseCheckbox)
+        topPanel.add(hideDebugCheckbox)
+        hideDebugCheckbox.addActionListener { 
+            needsUIUpdate = true
+            updateUI() 
+        }
         contentPanel.add(topPanel, BorderLayout.NORTH)
         outputText.isEditable = false
         outputText.font = Font("Monospaced", Font.PLAIN, 9)
@@ -344,7 +350,15 @@ class GameOutputWindow(
         synchronized(displayBuffer) {
             if (displayBuffer.isEmpty()) return
 
-            val text = displayBuffer.takeLast(maxDisplayLines).joinToString("\n")
+            val linesToDisplay = if (hideDebugCheckbox.isSelected) {
+                displayBuffer.takeLast(maxDisplayLines).filter { line ->
+                    !isDebugLine(line)
+                }
+            } else {
+                displayBuffer.takeLast(maxDisplayLines)
+            }
+            
+            val text = linesToDisplay.joinToString("\n")
 
             SwingUtilities.invokeLater {
                 if (!isClosing) {
@@ -355,6 +369,16 @@ class GameOutputWindow(
 
             needsUIUpdate = false
         }
+    }
+
+    private fun isDebugLine(line: String): Boolean {
+        val lowerLine = line.lowercase()
+        return lowerLine.contains("fixme:") ||
+               lowerLine.contains("warn:") ||
+               lowerLine.contains("err:") ||
+               lowerLine.contains("trace:") ||
+               (lowerLine.contains("[warn]") && !lowerLine.contains("protonfixes")) ||
+               (lowerLine.contains("[err]") && !lowerLine.contains("version mismatch"))
     }
 
     fun appendOutput(text: String, color: String? = null) {
@@ -856,6 +880,132 @@ class ChangePrefixDialog(
 
     data class PrefixComboItem(val name: String, val path: String) {
         override fun toString() = name
+    }
+}
+
+class GameConfigDialog(
+    private val game: Game,
+    parent: JFrame,
+    private val onLaunchOptions: (Game) -> Unit,
+    private val onPrefixManager: (Game) -> Unit,
+    private val onProtonManager: (Game) -> Unit,
+    private val onChangePrefix: (Game) -> Unit
+) : JDialog(parent, "Configure - ${game.name}", true) {
+
+    private val verboseCheckbox = JCheckBox("Enable Verbose Logging (show all Wine debug)", game.verboseLogging)
+
+    init {
+        initUI()
+    }
+
+    private fun initUI() {
+        minimumSize = Dimension(450, 400)
+        
+        val mainPanel = JPanel()
+        mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
+        mainPanel.border = EmptyBorder(15, 15, 15, 15)
+        
+        val titleLabel = JLabel("Game Configuration")
+        titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
+        titleLabel.alignmentX = Component.LEFT_ALIGNMENT
+        mainPanel.add(titleLabel)
+        mainPanel.add(Box.createVerticalStrut(15))
+        
+        val loggingPanel = JPanel()
+        loggingPanel.layout = BoxLayout(loggingPanel, BoxLayout.Y_AXIS)
+        loggingPanel.border = BorderFactory.createTitledBorder("Logging Options")
+        loggingPanel.alignmentX = Component.LEFT_ALIGNMENT
+        
+        verboseCheckbox.alignmentX = Component.LEFT_ALIGNMENT
+        verboseCheckbox.toolTipText = "When enabled, shows all Wine debug output for this game"
+        loggingPanel.add(verboseCheckbox)
+        loggingPanel.add(Box.createVerticalStrut(5))
+        
+        val loggingInfoLabel = JLabel("<html><small>Verbose logging can help diagnose issues but generates a lot of output</small></html>")
+        loggingInfoLabel.foreground = Color(0x88, 0x88, 0x88)
+        loggingInfoLabel.alignmentX = Component.LEFT_ALIGNMENT
+        loggingPanel.add(loggingInfoLabel)
+        
+        mainPanel.add(loggingPanel)
+        mainPanel.add(Box.createVerticalStrut(15))
+        
+        val actionsPanel = JPanel()
+        actionsPanel.layout = BoxLayout(actionsPanel, BoxLayout.Y_AXIS)
+        actionsPanel.border = BorderFactory.createTitledBorder("Configuration Actions")
+        actionsPanel.alignmentX = Component.LEFT_ALIGNMENT
+        
+        val paramsBtn = JButton("Launch Parameters...").apply {
+            maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
+            alignmentX = Component.LEFT_ALIGNMENT
+            toolTipText = "Configure launch options and environment variables"
+            addActionListener {
+                onLaunchOptions(game)
+            }
+        }
+        actionsPanel.add(paramsBtn)
+        actionsPanel.add(Box.createVerticalStrut(8))
+        
+        val winetricksBtn = JButton("Winetricks...").apply {
+            maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
+            alignmentX = Component.LEFT_ALIGNMENT
+            toolTipText = "Wineprefix Manager (install Windows components, configure Wine)"
+            addActionListener {
+                onPrefixManager(game)
+            }
+        }
+        actionsPanel.add(winetricksBtn)
+        actionsPanel.add(Box.createVerticalStrut(8))
+        
+        val protonBtn = JButton("Proton Manager...").apply {
+            maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
+            alignmentX = Component.LEFT_ALIGNMENT
+            toolTipText = "Select and manage Proton compatibility layer"
+            addActionListener {
+                onProtonManager(game)
+            }
+        }
+        actionsPanel.add(protonBtn)
+        actionsPanel.add(Box.createVerticalStrut(8))
+        
+        val changePrefixBtn = JButton("Change Wineprefix...").apply {
+            maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
+            alignmentX = Component.LEFT_ALIGNMENT
+            toolTipText = "Change the Wine prefix used by this game"
+            addActionListener {
+                onChangePrefix(game)
+            }
+        }
+
+        actionsPanel.add(changePrefixBtn)
+        mainPanel.add(actionsPanel)
+        mainPanel.add(Box.createVerticalGlue())
+        
+        val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
+        buttonPanel.alignmentX = Component.LEFT_ALIGNMENT
+        buttonPanel.maximumSize = Dimension(Short.MAX_VALUE.toInt(), 40)
+        
+        val saveBtn = JButton("Save").apply {
+            preferredSize = Dimension(80, 32)
+            addActionListener {
+                game.verboseLogging = verboseCheckbox.isSelected
+                dispose()
+            }
+        }
+        
+        val cancelBtn = JButton("Cancel").apply {
+            preferredSize = Dimension(80, 32)
+            addActionListener { dispose() }
+        }
+        
+        buttonPanel.add(saveBtn)
+        buttonPanel.add(cancelBtn)
+        
+        mainPanel.add(Box.createVerticalStrut(10))
+        mainPanel.add(buttonPanel)
+        
+        contentPane = mainPanel
+        pack()
+        setLocationRelativeTo(parent)
     }
 }
 
@@ -1586,7 +1736,8 @@ class GameItemWidgetWithImage(
     private val onLaunchOptions: (Game) -> Unit,
     private val onSaveGames: () -> Unit,
     private val isGamePlaying: (Game) -> Boolean,
-    private val onRename: (Game) -> Unit
+    private val onRename: (Game) -> Unit,
+    private val onConfigure: (Game) -> Unit
 ) : JPanel() {
 
     private val imageLabel = JLabel()
@@ -1658,39 +1809,13 @@ class GameItemWidgetWithImage(
         add(Box.createHorizontalGlue())
 
         if (game.getGameType() == GameType.WINDOWS) {
-            val loBtn = JButton("Params").apply {
+            val configureBtn = JButton("Configure").apply {
                 preferredSize = Dimension(100, 28)
                 maximumSize = Dimension(100, 28)
-                toolTipText = "Launch Options"
-                addActionListener { onLaunchOptions(game) }
+                toolTipText = "Configure game settings (params, winetricks, proton, prefix, logging)"
+                addActionListener { onConfigure(game) }
             }
-            add(loBtn)
-            add(Box.createHorizontalStrut(5))
-
-            val wpmBtn = JButton("Winetricks").apply {
-                preferredSize = Dimension(100, 28)
-                maximumSize = Dimension(100, 28)
-                toolTipText = "Wineprefix Manager (Winetricks)"
-                addActionListener { onPrefixManager(game) }
-            }
-            add(wpmBtn)
-            add(Box.createHorizontalStrut(5))
-
-            val pmwBtn = JButton("Proton").apply {
-                preferredSize = Dimension(90, 28)
-                maximumSize = Dimension(90, 28)
-                toolTipText = "Proton Manager Window"
-                addActionListener { onProtonManager(game) }
-            }
-            add(pmwBtn)
-            add(Box.createHorizontalStrut(5))
-
-            val changePrefixBtn = JButton("Change Prefix").apply {
-                preferredSize = Dimension(120, 28)
-                maximumSize = Dimension(120, 28)
-                addActionListener { onChangePrefix(game) }
-            }
-            add(changePrefixBtn)
+            add(configureBtn)
             add(Box.createHorizontalStrut(5))
         }
 
@@ -1990,10 +2115,12 @@ class GameItemWidgetWithImage(
 
         val mainPanel = JPanel(BorderLayout())
         mainPanel.border = EmptyBorder(20, 20, 20, 20)
+        mainPanel.background = Color(34, 35, 36)
 
         val titleLabel = JLabel("Statistics for ${game.name}")
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
         titleLabel.border = EmptyBorder(0, 0, 20, 0)
+        titleLabel.foreground = Color.WHITE
         mainPanel.add(titleLabel, BorderLayout.NORTH)
 
         val tableData = arrayOf(
@@ -2012,8 +2139,15 @@ class GameItemWidgetWithImage(
         table.font = table.font.deriveFont(14f)
         table.rowHeight = 25
         table.setShowGrid(true)
-        table.gridColor = java.awt.Color(220, 220, 220)
+        table.gridColor = Color(60, 60, 60)
         table.setEnabled(false)
+        table.background = Color(45, 45, 48)
+        table.foreground = Color.WHITE
+        
+        val tableHeader = table.tableHeader
+        tableHeader.background = Color(34, 35, 36)
+        tableHeader.foreground = Color.WHITE
+        tableHeader.font = tableHeader.font.deriveFont(Font.BOLD)
 
         table.setDefaultRenderer(Any::class.java, object : javax.swing.table.DefaultTableCellRenderer() {
             override fun getTableCellRendererComponent(
@@ -2025,13 +2159,14 @@ class GameItemWidgetWithImage(
                 column: Int
             ): java.awt.Component {
                 val cell = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column)
+                cell.foreground = Color.WHITE
                 if (row == 3) {
-                    cell.background = java.awt.Color(255, 255, 200)
+                    cell.background = Color(60, 63, 45)
                     cell.font = cell.font.deriveFont(Font.BOLD)
                 } else if (row == 4) {
-                    cell.background = java.awt.Color(230, 240, 255)
+                    cell.background = Color(45, 50, 60)
                 } else {
-                    cell.background = java.awt.Color.WHITE
+                    cell.background = Color(45, 45, 48)
                 }
                 return cell
             }
@@ -2389,6 +2524,7 @@ class GameLauncher : JFrame("Styx") {
         val toolsMenu = JMenu("Tools")
         val wineserverMgmtItem = JMenuItem("Wineserver Management").apply {
             addActionListener { openWineserverManagement() }
+            accelerator = KeyStroke.getKeyStroke("control K")
         }
         toolsMenu.add(wineserverMgmtItem)
 
@@ -2506,7 +2642,8 @@ class GameLauncher : JFrame("Styx") {
                     ::openLaunchOptions,
                     ::saveGames,
                     ::isGamePlaying,
-                    ::renameGame
+                    ::renameGame,
+                    ::openGameConfig
                 )
             gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 70)
             gamesContainer.add(gameWidget)
@@ -2705,6 +2842,20 @@ class GameLauncher : JFrame("Styx") {
             saveGames()
             refreshGamesList()
         }
+    }
+
+    private fun openGameConfig(game: Game) {
+        val dialog = GameConfigDialog(
+            game,
+            this,
+            ::openLaunchOptions,
+            ::openPrefixManager,
+            ::openProtonManager,
+            ::changeGamePrefix
+        )
+        dialog.isVisible = true
+        saveGames()
+        refreshGamesList()
     }
 
     private fun openPrefixManager(game: Game) {
@@ -3085,7 +3236,7 @@ class GameLauncher : JFrame("Styx") {
                 env[key] = value
             }
 
-            if (outputWindow.isVerboseMode()) {
+            if (game.verboseLogging) {
                 env["WINEDEBUG"] = "+all"
                 outputWindow.appendOutput("Verbose mode enabled: WINEDEBUG=+all", "#0066cc")
             } else {
@@ -3224,7 +3375,7 @@ class GameLauncher : JFrame("Styx") {
                                                 outputWindow.appendOutput("[WARN] $trimmed", "#cc6600")
 
                                             "fixme:" in trimmed.lowercase() -> {
-                                                if (outputWindow.isVerboseMode()) {
+                                                if (game.verboseLogging) {
                                                     outputWindow.appendOutput("[FIXME] $trimmed", "#666666")
                                                 }
                                             }
