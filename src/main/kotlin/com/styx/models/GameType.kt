@@ -1,4 +1,4 @@
-package com.styx
+package com.styx.models
 
 enum class GameType {
     WINDOWS,

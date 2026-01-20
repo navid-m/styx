@@ -15,6 +15,9 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlin.io.path.*
 import com.formdev.flatlaf.themes.FlatMacDarkLaf
+import com.styx.models.Game
+import com.styx.models.GameType
+import com.styx.models.PrefixInfo
 
 /**
  * Wineserver Management Window
