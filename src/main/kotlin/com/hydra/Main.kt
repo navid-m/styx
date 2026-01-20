@@ -1640,6 +1640,7 @@ class GameLauncher : JFrame("Hydra") {
         val scrollPane = JScrollPane(gamesContainer)
         scrollPane.border = BorderFactory.createTitledBorder("")
         scrollPane.verticalScrollBar.unitIncrement = 16
+        scrollPane.verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_ALWAYS
         mainPanel.add(scrollPane, BorderLayout.CENTER)
 
         val fullBottomPanel = JPanel(BorderLayout())
