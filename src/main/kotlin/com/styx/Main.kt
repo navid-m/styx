@@ -2451,13 +2451,6 @@ class GameLauncher : JFrame("Styx") {
                 val type = object : TypeToken<List<Game>>() {}.type
                 games.clear()
                 val loadedGames: List<Game> = gson.fromJson(json, type)
-
-                loadedGames.forEach { game ->
-                    if (game.getGameType() == null) {
-                        game.type = GameType.WINDOWS
-                    }
-                }
-
                 games.addAll(loadedGames)
                 refreshGamesList()
             } catch (e: Exception) {
