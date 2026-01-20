@@ -1707,14 +1707,6 @@ class GameLauncher : JFrame("Hydra") {
                 val type = object : TypeToken<List<Game>>() {}.type
                 games.clear()
                 val loadedGames: List<Game> = gson.fromJson(json, type)
-                loadedGames.forEach { game ->
-                    if (game.launchOptions == null) {
-                        game.launchOptions = mutableMapOf()
-                    }
-                    if (game.imagePath == null) {
-                        game.imagePath = null
-                    }
-                }
                 games.addAll(loadedGames)
                 refreshGamesList()
             } catch (e: Exception) {
