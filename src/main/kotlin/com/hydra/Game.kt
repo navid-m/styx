@@ -14,6 +14,10 @@ data class Game(
     var timesCrashed: Int = 0,
     var type: GameType? = null
 ) {
-    // Helper to get type, defaulting to WINDOWS for backward compatibility
+    /**
+     * Helper to get game type.
+     *
+     * Defaults to windows for backwards compatibility.
+     */
     fun getGameType(): GameType = type ?: GameType.WINDOWS
 }
