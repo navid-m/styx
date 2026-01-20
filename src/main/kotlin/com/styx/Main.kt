@@ -10,10 +10,218 @@ import java.time.format.DateTimeFormatter
 import javax.swing.*
 import javax.swing.border.EmptyBorder
 import javax.swing.border.LineBorder
+import javax.swing.table.DefaultTableModel
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlin.io.path.*
 import com.formdev.flatlaf.themes.FlatMacDarkLaf
+
+/**
+ * Wineserver Management Window
+ * Displays running wineserver processes and allows killing them
+ */
+class WineserverManagementWindow(parent: JFrame? = null) : JFrame("Wineserver Management") {
+    private val tableModel = DefaultTableModel(arrayOf("PID", "Command", "User"), 0)
+    private val table = JTable(tableModel)
+    private var refreshTimer: javax.swing.Timer? = null
+
+    init {
+        defaultCloseOperation = DISPOSE_ON_CLOSE
+        setSize(700, 450)
+        setLocationRelativeTo(parent)
+
+        val mainPanel = JPanel(BorderLayout(10, 10))
+        mainPanel.border = EmptyBorder(10, 10, 10, 10)
+
+        val titleLabel = JLabel("Running Wineserver Processes")
+        titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 14f)
+        mainPanel.add(titleLabel, BorderLayout.NORTH)
+
+        table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION)
+        table.fillsViewportHeight = true
+        val scrollPane = JScrollPane(table)
+        mainPanel.add(scrollPane, BorderLayout.CENTER)
+
+        val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
+
+        val refreshBtn = JButton("Refresh").apply {
+            preferredSize = Dimension(100, 32)
+            addActionListener { refreshProcessList() }
+        }
+
+        val killSelectedBtn = JButton("Kill Selected").apply {
+            preferredSize = Dimension(120, 32)
+            addActionListener { killSelectedProcesses() }
+        }
+
+        val killAllBtn = JButton("Kill All Wineservers").apply {
+            preferredSize = Dimension(170, 32)
+            background = Color(0xCC, 0x00, 0x00)
+            foreground = Color.WHITE
+            font = font.deriveFont(Font.BOLD)
+            addActionListener { killAllWineservers() }
+        }
+
+        val closeBtn = JButton("Close").apply {
+            preferredSize = Dimension(80, 32)
+            addActionListener { dispose() }
+        }
+
+        buttonPanel.add(refreshBtn)
+        buttonPanel.add(killSelectedBtn)
+        buttonPanel.add(killAllBtn)
+        buttonPanel.add(closeBtn)
+        mainPanel.add(buttonPanel, BorderLayout.SOUTH)
+
+        contentPane = mainPanel
+
+        addWindowListener(object : java.awt.event.WindowAdapter() {
+            override fun windowClosing(e: java.awt.event.WindowEvent?) {
+                stopAutoRefresh()
+            }
+        })
+
+        startAutoRefresh()
+        refreshProcessList()
+    }
+
+    private fun startAutoRefresh() {
+        refreshTimer = javax.swing.Timer(2000) {
+            refreshProcessList()
+        }
+        refreshTimer?.start()
+    }
+
+    private fun stopAutoRefresh() {
+        refreshTimer?.stop()
+        refreshTimer = null
+    }
+
+    private fun refreshProcessList() {
+        Thread {
+            try {
+                val pb = ProcessBuilder("bash", "-c", "ps aux | grep '[w]ineserver' || true")
+                val process = pb.start()
+                val output = process.inputStream.bufferedReader().readText()
+                process.waitFor()
+
+                val processes = mutableListOf<Array<String>>()
+                output.lines().forEach { line ->
+                    if (line.isNotBlank()) {
+                        val parts = line.trim().split(Regex("\\s+"), limit = 11)
+                        if (parts.size >= 2) {
+                            val user = parts[0]
+                            val pid = parts[1]
+                            val command = parts.drop(10).joinToString(" ")
+                            processes.add(arrayOf(pid, command, user))
+                        }
+                    }
+                }
+
+                SwingUtilities.invokeLater {
+                    tableModel.rowCount = 0
+                    processes.forEach { tableModel.addRow(it) }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
+    }
+
+    private fun killSelectedProcesses() {
+        val selectedRows = table.selectedRows
+        if (selectedRows.isEmpty()) {
+            JOptionPane.showMessageDialog(
+                this,
+                "No processes selected",
+                "Info",
+                JOptionPane.INFORMATION_MESSAGE
+            )
+            return
+        }
+
+        val pids = selectedRows.map { tableModel.getValueAt(it, 0).toString() }
+        val result = JOptionPane.showConfirmDialog(
+            this,
+            "Kill ${pids.size} selected wineserver process(es)?\n\nPIDs: ${pids.joinToString(", ")}",
+            "Confirm Kill",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        )
+
+        if (result == JOptionPane.YES_OPTION) {
+            Thread {
+                try {
+                    pids.forEach { pid ->
+                        ProcessBuilder("kill", "-9", pid).start().waitFor()
+                    }
+                    SwingUtilities.invokeLater {
+                        refreshProcessList()
+                        JOptionPane.showMessageDialog(
+                            this,
+                            "Selected processes terminated",
+                            "Success",
+                            JOptionPane.INFORMATION_MESSAGE
+                        )
+                    }
+                } catch (e: Exception) {
+                    SwingUtilities.invokeLater {
+                        JOptionPane.showMessageDialog(
+                            this,
+                            "Failed to kill processes: ${e.message}",
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                        )
+                    }
+                }
+            }.start()
+        }
+    }
+
+    private fun killAllWineservers() {
+        val result = JOptionPane.showConfirmDialog(
+            this,
+            "This will terminate ALL running wineserver processes on your system.\n\n" +
+                    "This is useful to fix version mismatches but will affect:\n" +
+                    "• All Wine/Proton games currently running\n" +
+                    "• Any Wine applications in use\n\n" +
+                    "Continue?",
+            "Warning: Kill All Wineservers",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        )
+
+        if (result == JOptionPane.YES_OPTION) {
+            Thread {
+                try {
+                    val pb = ProcessBuilder("bash", "-c", "pgrep -x wineserver | xargs -r kill -9")
+                    val process = pb.start()
+                    process.waitFor()
+
+                    SwingUtilities.invokeLater {
+                        refreshProcessList()
+                        JOptionPane.showMessageDialog(
+                            this,
+                            "All wineserver processes have been terminated.\n" +
+                                    "You can now launch games with a fresh Wine environment.",
+                            "Success",
+                            JOptionPane.INFORMATION_MESSAGE
+                        )
+                    }
+                } catch (e: Exception) {
+                    SwingUtilities.invokeLater {
+                        JOptionPane.showMessageDialog(
+                            this,
+                            "Failed to kill wineservers: ${e.message}",
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                        )
+                    }
+                }
+            }.start()
+        }
+    }
+}
 
 /**
  * The game output window.
@@ -227,7 +435,7 @@ class GameOutputWindow(
 
     private fun killWineserver() {
         if (prefixPath == null) return
-        
+
         Thread {
             try {
                 appendOutput("")
@@ -236,23 +444,23 @@ class GameOutputWindow(
                 appendOutput("═".repeat(60), "#0066cc")
                 appendOutput("Prefix: $prefixPath")
                 appendOutput("")
-                
+
                 val pb = ProcessBuilder()
                 val env = pb.environment()
                 env["WINEPREFIX"] = prefixPath
-                
+
                 if (useProton) {
                     env["STEAM_COMPAT_DATA_PATH"] = prefixPath
                     appendOutput("Using Proton environment for wineserver", "#00aa00")
                 }
-                
+
                 pb.command("wineserver", "-k")
                 appendOutput("Command: wineserver -k")
                 appendOutput("")
-                
+
                 val process = pb.start()
                 val exitCode = process.waitFor()
-                
+
                 appendOutput("")
                 if (exitCode == 0) {
                     appendOutput("✓ Wineserver killed successfully", "#008800")
@@ -479,7 +687,7 @@ class ChangePrefixDialog(
 
         prefixPanel.add(browseBtn)
         newGroup.add(prefixPanel)
-        
+
         if (game.protonPath != null) {
             val protonPrefixPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
             val useProtonPrefixBtn = JButton("Use Proton Wineprefix").apply {
@@ -490,7 +698,7 @@ class ChangePrefixDialog(
             protonPrefixPanel.add(useProtonPrefixBtn)
             newGroup.add(protonPrefixPanel)
         }
-        
+
         mainPanel.add(newGroup)
         mainPanel.add(Box.createVerticalStrut(10))
 
@@ -552,7 +760,7 @@ class ChangePrefixDialog(
         newPrefix = newPrefixPath
         dispose()
     }
-    
+
     private fun useProtonCompatdataPrefix() {
         val protonPath = game.protonPath ?: return
         val home = Paths.get(System.getProperty("user.home"))
@@ -560,7 +768,7 @@ class ChangePrefixDialog(
             home.resolve(".steam/steam/steamapps/compatdata"),
             home.resolve(".local/share/Steam/steamapps/compatdata")
         )
-        
+
         var foundPrefix: String? = null
         for (compatdataPath in compatdataLocations) {
             if (Files.exists(compatdataPath)) {
@@ -582,7 +790,7 @@ class ChangePrefixDialog(
                 }
             }
         }
-        
+
         if (foundPrefix == null) {
             val protonPrefixes = mutableListOf<PrefixInfo>()
             for (compatdataPath in compatdataLocations) {
@@ -604,7 +812,7 @@ class ChangePrefixDialog(
                     }
                 }
             }
-            
+
             if (protonPrefixes.isEmpty()) {
                 JOptionPane.showMessageDialog(
                     this,
@@ -614,7 +822,7 @@ class ChangePrefixDialog(
                 )
                 return
             }
-            
+
             val selected = JOptionPane.showInputDialog(
                 this,
                 "Select a Proton compatdata prefix:",
@@ -624,16 +832,16 @@ class ChangePrefixDialog(
                 protonPrefixes.map { it.name }.toTypedArray(),
                 protonPrefixes[0].name
             ) as? String
-            
+
             if (selected != null) {
                 foundPrefix = protonPrefixes.find { it.name == selected }?.path
             }
         }
-        
+
         if (foundPrefix != null) {
             prefixCombo.addItem(PrefixComboItem("Proton Compatdata", foundPrefix!!))
             prefixCombo.selectedIndex = prefixCombo.itemCount - 1
-            
+
             JOptionPane.showMessageDialog(
                 this,
                 "Proton wineprefix selected. Click 'Change Prefix' to apply.",
@@ -1414,10 +1622,12 @@ class GameItemWidgetWithImage(
                 font = font.deriveFont(11f)
                 foreground = Color(100, 200, 255)
             }
+
             GameType.STEAM -> JLabel("Type: Steam").apply {
                 font = font.deriveFont(11f)
                 foreground = Color(102, 153, 255)
             }
+
             GameType.WINDOWS -> {
                 val number = Regex("/(\\d+)/").find(game.prefix)?.groupValues?.get(1)
                 JLabel("Prefix: ${number}").apply {
@@ -1732,6 +1942,7 @@ class GameItemWidgetWithImage(
                     )
                 }
             }
+
             GameType.STEAM -> {
                 val newSteamId = JOptionPane.showInputDialog(
                     this,
@@ -1756,9 +1967,11 @@ class GameItemWidgetWithImage(
                     )
                 }
             }
+
             GameType.WINDOWS -> {
                 // Should NEVER happen.
             }
+
             null -> {
 
             }
@@ -1798,7 +2011,7 @@ class GameItemWidgetWithImage(
         table.setShowGrid(true)
         table.gridColor = java.awt.Color(220, 220, 220)
         table.setEnabled(false)
-        
+
         table.setDefaultRenderer(Any::class.java, object : javax.swing.table.DefaultTableCellRenderer() {
             override fun getTableCellRendererComponent(
                 table: JTable,
@@ -2060,6 +2273,8 @@ class GameLauncher : JFrame("Styx") {
             }
         })
 
+        createMenuBar()
+
         val mainPanel = JPanel(BorderLayout(10, 10))
         mainPanel.border = EmptyBorder(10, 10, 10, 10)
 
@@ -2113,18 +2328,8 @@ class GameLauncher : JFrame("Styx") {
             addActionListener { scanPrefixes() }
         }
 
-        val killAllServersBtn = JButton("Kill All Wineservers").apply {
-            preferredSize = Dimension(170, 32)
-            background = Color(0xCC, 0x00, 0x00)
-            foreground = Color.WHITE
-            font = font.deriveFont(Font.BOLD)
-            toolTipText = "Terminate all wineserver processes (fixes version mismatches)"
-            addActionListener { killAllWineservers() }
-        }
-
         leftButtonPanel.add(removeBtn)
         leftButtonPanel.add(rescanBtn)
-        leftButtonPanel.add(killAllServersBtn)
 
         val rightButtonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
 
@@ -2168,6 +2373,63 @@ class GameLauncher : JFrame("Styx") {
         setLocationRelativeTo(null)
     }
 
+    private fun createMenuBar() {
+        val menuBar = JMenuBar()
+        val fileMenu = JMenu("File")
+        val quitItem = JMenuItem("Quit").apply {
+            addActionListener { handleApplicationClose() }
+            accelerator = KeyStroke.getKeyStroke("control Q")
+        }
+
+        fileMenu.add(quitItem)
+
+        val toolsMenu = JMenu("Tools")
+        val wineserverMgmtItem = JMenuItem("Wineserver Management").apply {
+            addActionListener { openWineserverManagement() }
+        }
+        toolsMenu.add(wineserverMgmtItem)
+
+        val helpMenu = JMenu("Help")
+        val aboutItem = JMenuItem("About").apply {
+            addActionListener { showAboutDialog() }
+        }
+
+        helpMenu.add(aboutItem)
+        menuBar.add(fileMenu)
+        menuBar.add(toolsMenu)
+        menuBar.add(helpMenu)
+
+        jMenuBar = menuBar
+    }
+
+    private fun openWineserverManagement() {
+        val window = WineserverManagementWindow(this)
+        window.isVisible = true
+    }
+
+    private fun showAboutDialog() {
+        val message = """
+            <html>
+            <h2>Styx</h2>
+            <p>v0.0.2</p>
+            <br>
+            <p>A game launcher for Linux</p>
+            <br>
+            <p>By Navid M</p>
+            <br />
+            <a href="https://github.com/navid-m/styx">GitHub</a>
+            </ul>
+            </html>
+        """.trimIndent()
+
+        JOptionPane.showMessageDialog(
+            this,
+            message,
+            "About Styx",
+            JOptionPane.INFORMATION_MESSAGE
+        )
+    }
+
     private fun scanPrefixes() {
         statusLabel.text = "Scanning for Wine/Proton prefixes..."
 
@@ -2182,63 +2444,6 @@ class GameLauncher : JFrame("Styx") {
         }
     }
 
-    private fun killAllWineservers() {
-        val result = JOptionPane.showConfirmDialog(
-            this,
-            "This will terminate ALL running wineserver processes on your system.\n\n" +
-            "This is useful to fix version mismatches but will affect:\n" +
-            "• All Wine/Proton games currently running\n" +
-            "• Any Wine applications in use\n\n" +
-            "Continue?",
-            "Warning: Kill All Wineservers",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.WARNING_MESSAGE
-        )
-
-        if (result == JOptionPane.YES_OPTION) {
-            Thread {
-                try {
-                    statusLabel.text = "Killing all wineservers..."
-                    
-                    val pb = ProcessBuilder("bash", "-c", "pgrep -x wineserver | xargs -r kill -9")
-                    val process = pb.start()
-                    val exitCode = process.waitFor()
-                    
-                    SwingUtilities.invokeLater {
-                        if (exitCode == 0 || exitCode == 123) {
-                            statusLabel.text = "All wineservers terminated"
-                            JOptionPane.showMessageDialog(
-                                this,
-                                "All wineserver processes have been terminated.\n" +
-                                "You can now launch games with a fresh Wine environment.",
-                                "Success",
-                                JOptionPane.INFORMATION_MESSAGE
-                            )
-                        } else {
-                            statusLabel.text = "Wineserver cleanup completed"
-                            JOptionPane.showMessageDialog(
-                                this,
-                                "Wineserver cleanup completed.",
-                                "Info",
-                                JOptionPane.INFORMATION_MESSAGE
-                            )
-                        }
-                    }
-                } catch (e: Exception) {
-                    SwingUtilities.invokeLater {
-                        statusLabel.text = "Error killing wineservers"
-                        JOptionPane.showMessageDialog(
-                            this,
-                            "Failed to kill wineservers: ${e.message}",
-                            "Error",
-                            JOptionPane.ERROR_MESSAGE
-                        )
-                    }
-                }
-            }.start()
-        }
-    }
-
     private fun loadGames() {
         if (configFile.exists()) {
             try {
@@ -2246,13 +2451,13 @@ class GameLauncher : JFrame("Styx") {
                 val type = object : TypeToken<List<Game>>() {}.type
                 games.clear()
                 val loadedGames: List<Game> = gson.fromJson(json, type)
-                
+
                 loadedGames.forEach { game ->
                     if (game.getGameType() == null) {
                         game.type = GameType.WINDOWS
                     }
                 }
-                
+
                 games.addAll(loadedGames)
                 refreshGamesList()
             } catch (e: Exception) {
@@ -2757,12 +2962,12 @@ class GameLauncher : JFrame("Styx") {
 
             val processBuilder = ProcessBuilder("xdg-open", steamUrl)
             val process = processBuilder.start()
-            
+
             game.timesOpened++
 
             Thread {
                 process.waitFor()
-                
+
                 SwingUtilities.invokeLater {
                     outputWindow.appendOutput("")
                     outputWindow.appendOutput("═".repeat(60), "#0066cc")
@@ -2791,13 +2996,16 @@ class GameLauncher : JFrame("Styx") {
                 launchNativeLinuxGame(game)
                 return
             }
+
             GameType.STEAM -> {
                 launchSteamGame(game)
                 return
             }
+
             GameType.WINDOWS -> {
                 // Continue with Wine/Proton launch...
             }
+
             null -> {
 
             }
