@@ -827,23 +827,23 @@ class GameItemWidget(QWidget):
         layout.addLayout(info_layout, 1)
 
         # Buttons
-        wpm_btn = QPushButton("WPM")
+        wpm_btn = QPushButton("Winetricks")
         wpm_btn.setMinimumHeight(28)
-        wpm_btn.setMaximumWidth(60)
+        wpm_btn.setMaximumWidth(80)
         wpm_btn.setToolTip("Wineprefix Manager (Winetricks)")
         wpm_btn.clicked.connect(lambda: self.prefix_manager_clicked.emit(self.game))
         layout.addWidget(wpm_btn)
 
-        pmw_btn = QPushButton("PMW")
+        pmw_btn = QPushButton("Proton")
         pmw_btn.setMinimumHeight(28)
-        pmw_btn.setMaximumWidth(60)
+        pmw_btn.setMaximumWidth(80)
         pmw_btn.setToolTip("Proton Manager Window")
         pmw_btn.clicked.connect(lambda: self.proton_manager_clicked.emit(self.game))
         layout.addWidget(pmw_btn)
 
         rename_btn = QPushButton("Rename")
         rename_btn.setMinimumHeight(28)
-        rename_btn.setMaximumWidth(100)
+        rename_btn.setMaximumWidth(80)
         rename_btn.clicked.connect(lambda: self.rename_clicked.emit(self.game))
         layout.addWidget(rename_btn)
 
@@ -901,6 +901,7 @@ class GameItemWidget(QWidget):
             try:
                 # Determine the OS and open the folder appropriately
                 import platform
+
                 system = platform.system()
 
                 if system == "Linux":
@@ -912,21 +913,15 @@ class GameItemWidget(QWidget):
                 else:
                     # Fallback: show a message if the system isn't recognized
                     QMessageBox.information(
-                        self,
-                        "Open Game Folder",
-                        f"Game folder: {game_folder}"
+                        self, "Open Game Folder", f"Game folder: {game_folder}"
                     )
             except Exception as e:
                 QMessageBox.warning(
-                    self,
-                    "Error",
-                    f"Failed to open game folder: {str(e)}"
+                    self, "Error", f"Failed to open game folder: {str(e)}"
                 )
         else:
             QMessageBox.warning(
-                self,
-                "Error",
-                f"Game folder does not exist: {game_folder}"
+                self, "Error", f"Game folder does not exist: {game_folder}"
             )
 
     def open_wine_prefix_location(self):
@@ -937,6 +932,7 @@ class GameItemWidget(QWidget):
             try:
                 # Determine the OS and open the folder appropriately
                 import platform
+
                 system = platform.system()
 
                 if system == "Linux":
@@ -948,21 +944,15 @@ class GameItemWidget(QWidget):
                 else:
                     # Fallback: show a message if the system isn't recognized
                     QMessageBox.information(
-                        self,
-                        "Open Wine Prefix Location",
-                        f"Wine prefix: {prefix_path}"
+                        self, "Open Wine Prefix Location", f"Wine prefix: {prefix_path}"
                     )
             except Exception as e:
                 QMessageBox.warning(
-                    self,
-                    "Error",
-                    f"Failed to open wine prefix location: {str(e)}"
+                    self, "Error", f"Failed to open wine prefix location: {str(e)}"
                 )
         else:
             QMessageBox.warning(
-                self,
-                "Error",
-                f"Wine prefix does not exist: {prefix_path}"
+                self, "Error", f"Wine prefix does not exist: {prefix_path}"
             )
 
     def load_game_art(self):
@@ -1021,7 +1011,15 @@ class GameItemWidget(QWidget):
             game_dir = game_exe_path.parent
 
             # Define image file extensions to look for
-            image_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp'}
+            image_extensions = {
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".bmp",
+                ".tiff",
+                ".webp",
+            }
 
             # Walk through the game directory recursively
             for root, dirs, files in os.walk(game_dir):
