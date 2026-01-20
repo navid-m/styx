@@ -1333,34 +1333,46 @@ class GameItemWidgetWithImage(
         mainPanel.add(titleLabel)
         mainPanel.add(Box.createVerticalStrut(20))
 
-        fun addStatRow(label: String, value: String) {
-            val panel = JPanel()
-            panel.layout = BoxLayout(panel, BoxLayout.X_AXIS)
+        fun addStatRow(label: String, value: String): JLabel {
+            val panel = JPanel(BorderLayout())
             panel.alignmentX = Component.LEFT_ALIGNMENT
             panel.maximumSize = Dimension(Int.MAX_VALUE, 30)
 
             val labelComp = JLabel(label)
             labelComp.font = labelComp.font.deriveFont(Font.PLAIN, 14f)
-            panel.add(labelComp)
-            panel.add(Box.createHorizontalGlue())
+            labelComp.border = EmptyBorder(0, 0, 0, 20)
+            panel.add(labelComp, BorderLayout.WEST)
 
             val valueComp = JLabel(value)
             valueComp.font = valueComp.font.deriveFont(Font.BOLD, 14f)
-            panel.add(valueComp)
+            panel.add(valueComp, BorderLayout.EAST)
 
             mainPanel.add(panel)
             mainPanel.add(Box.createVerticalStrut(10))
+            
+            return valueComp
         }
 
         addStatRow("Time Played:", formatTimePlayed(game.timePlayed))
         addStatRow("Times Opened:", game.timesOpened.toString())
         addStatRow("Times Crashed:", game.timesCrashed.toString())
 
-        val gameSize = calculateDirectorySize(File(game.executable).parentFile)
-        addStatRow("Game Size:", formatFileSize(gameSize))
+        val gameSizeLabel = addStatRow("Game Size:", "Calculating...")
+        val prefixSizeLabel = addStatRow("Wine Prefix Size:", "Calculating...")
 
-        val prefixSize = calculateDirectorySize(File(game.prefix))
-        addStatRow("Wine Prefix Size:", formatFileSize(prefixSize))
+        Thread {
+            val gameSize = calculateDirectorySize(File(game.executable).parentFile)
+            SwingUtilities.invokeLater {
+                gameSizeLabel.text = formatFileSize(gameSize)
+            }
+        }.start()
+
+        Thread {
+            val prefixSize = calculateDirectorySize(File(game.prefix))
+            SwingUtilities.invokeLater {
+                prefixSizeLabel.text = formatFileSize(prefixSize)
+            }
+        }.start()
 
         mainPanel.add(Box.createVerticalGlue())
 
