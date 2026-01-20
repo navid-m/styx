@@ -1574,7 +1574,7 @@ class GameLauncher : JFrame("Hydra") {
     }
 
     private fun initUI() {
-        minimumSize = Dimension(800, 600)
+        minimumSize = Dimension(900, 600)
         defaultCloseOperation = DO_NOTHING_ON_CLOSE
 
         addWindowListener(object : java.awt.event.WindowAdapter() {
