@@ -2759,8 +2759,7 @@ class GameLauncher : JFrame("Styx") {
             val process = processBuilder.start()
             
             game.timesOpened++
-            val startTime = System.currentTimeMillis()
-            
+
             Thread {
                 process.waitFor()
                 
