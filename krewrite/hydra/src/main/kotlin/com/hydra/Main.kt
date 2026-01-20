@@ -1551,6 +1551,7 @@ class GameLauncher : JFrame("Hydra") {
     private val statusLabel = JLabel("Ready")
     private val logReaderThreads = mutableListOf<Thread>()
     private val gameStartTimes = mutableMapOf<String, Long>()
+    private val searchField = JTextField()
 
     @Volatile
     private var isShuttingDown = false
@@ -1580,9 +1581,30 @@ class GameLauncher : JFrame("Hydra") {
         val mainPanel = JPanel(BorderLayout(10, 10))
         mainPanel.border = EmptyBorder(10, 10, 10, 10)
 
+        val topPanel = JPanel(BorderLayout(10, 5))
+        
         val titleLabel = JLabel("Library")
         titleLabel.font = titleLabel.font.deriveFont(Font.PLAIN, 18f)
-        mainPanel.add(titleLabel, BorderLayout.NORTH)
+        topPanel.add(titleLabel, BorderLayout.NORTH)
+        
+        val searchPanel = JPanel(BorderLayout(5, 0))
+        searchField.preferredSize = Dimension(300, 30)
+        searchPanel.add(searchField, BorderLayout.CENTER)
+        
+        searchField.document.addDocumentListener(object : javax.swing.event.DocumentListener {
+            override fun insertUpdate(e: javax.swing.event.DocumentEvent?) {
+                filterGames()
+            }
+            override fun removeUpdate(e: javax.swing.event.DocumentEvent?) {
+                filterGames()
+            }
+            override fun changedUpdate(e: javax.swing.event.DocumentEvent?) {
+                filterGames()
+            }
+        })
+        
+        topPanel.add(searchPanel, BorderLayout.SOUTH)
+        mainPanel.add(topPanel, BorderLayout.NORTH)
 
         gamesContainer.layout = BoxLayout(gamesContainer, BoxLayout.Y_AXIS)
         gamesContainer.border = EmptyBorder(10, 5, 5, 5)
@@ -1692,9 +1714,19 @@ class GameLauncher : JFrame("Hydra") {
     }
 
     private fun refreshGamesList() {
+        refreshGamesList(null)
+    }
+
+    private fun refreshGamesList(filter: String?) {
         gamesContainer.removeAll()
 
-        games.forEach { game ->
+        val filteredGames = if (filter.isNullOrBlank()) {
+            games
+        } else {
+            games.filter { it.name.contains(filter, ignoreCase = true) }
+        }
+
+        filteredGames.forEach { game ->
             val gameWidget =
                 GameItemWidgetWithImage(
                     game,
@@ -1714,6 +1746,11 @@ class GameLauncher : JFrame("Hydra") {
         gamesContainer.add(Box.createVerticalGlue())
         gamesContainer.revalidate()
         gamesContainer.repaint()
+    }
+
+    private fun filterGames() {
+        val searchText = searchField.text
+        refreshGamesList(searchText)
     }
 
     private fun isGamePlaying(game: Game): Boolean {
