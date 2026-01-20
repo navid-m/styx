@@ -1624,8 +1624,8 @@ class GameLauncher : JFrame("Hydra") {
         val mainPanel = JPanel(BorderLayout(10, 10))
         mainPanel.border = EmptyBorder(10, 10, 10, 10)
 
-        val titleLabel = JLabel("Game Library")
-        titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 14f)
+        val titleLabel = JLabel("Library")
+        titleLabel.font = titleLabel.font.deriveFont(Font.PLAIN, 18f)
         mainPanel.add(titleLabel, BorderLayout.NORTH)
 
         gamesContainer.layout = BoxLayout(gamesContainer, BoxLayout.Y_AXIS)
