@@ -1324,63 +1324,53 @@ class GameItemWidgetWithImage(
         statsWindow.minimumSize = Dimension(400, 400)
         statsWindow.setLocationRelativeTo(this)
 
-        val mainPanel = JPanel()
-        mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
+        val mainPanel = JPanel(BorderLayout())
         mainPanel.border = EmptyBorder(20, 20, 20, 20)
 
         val titleLabel = JLabel("Statistics for ${game.name}")
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
-        titleLabel.alignmentX = Component.LEFT_ALIGNMENT
-        mainPanel.add(titleLabel)
-        mainPanel.add(Box.createVerticalStrut(20))
+        titleLabel.border = EmptyBorder(0, 0, 20, 0)
+        mainPanel.add(titleLabel, BorderLayout.NORTH)
 
-        fun addStatRow(label: String, value: String): JLabel {
-            val panel = JPanel(BorderLayout())
-            panel.alignmentX = Component.LEFT_ALIGNMENT
-            panel.maximumSize = Dimension(Int.MAX_VALUE, 30)
+        val tableData = arrayOf(
+            arrayOf("Time Played", formatTimePlayed(game.timePlayed)),
+            arrayOf("Times Opened", game.timesOpened.toString()),
+            arrayOf("Times Crashed", game.timesCrashed.toString()),
+            arrayOf("Game Size", "Calculating..."),
+            arrayOf("Wine Prefix Size", "Calculating...")
+        )
 
-            val labelComp = JLabel(label)
-            labelComp.font = labelComp.font.deriveFont(Font.PLAIN, 14f)
-            labelComp.border = EmptyBorder(0, 0, 0, 20)
-            panel.add(labelComp, BorderLayout.WEST)
+        val columnNames = arrayOf("Statistic", "Value")
+        val tableModel = javax.swing.table.DefaultTableModel(tableData, columnNames)
+        val table = JTable(tableModel)
+        table.font = table.font.deriveFont(14f)
+        table.rowHeight = 25
+        table.setShowGrid(true)
+        table.gridColor = java.awt.Color(220, 220, 220)
+        table.setEnabled(false)
 
-            val valueComp = JLabel(value)
-            valueComp.font = valueComp.font.deriveFont(Font.BOLD, 14f)
-            panel.add(valueComp, BorderLayout.CENTER)
-
-            mainPanel.add(panel)
-            mainPanel.add(Box.createVerticalStrut(10))
-            
-            return valueComp
-        }
-
-        addStatRow("Time Played:", formatTimePlayed(game.timePlayed))
-        addStatRow("Times Opened:", game.timesOpened.toString())
-        addStatRow("Times Crashed:", game.timesCrashed.toString())
-
-        val gameSizeLabel = addStatRow("Game Size:", "Calculating...")
-        val prefixSizeLabel = addStatRow("Wine Prefix Size:", "Calculating...")
+        val scrollPane = JScrollPane(table)
+        mainPanel.add(scrollPane, BorderLayout.CENTER)
 
         Thread {
             val gameSize = calculateDirectorySize(File(game.executable).parentFile)
             SwingUtilities.invokeLater {
-                gameSizeLabel.text = formatFileSize(gameSize)
+                tableModel.setValueAt(formatFileSize(gameSize), 3, 1)
             }
         }.start()
 
         Thread {
             val prefixSize = calculateDirectorySize(File(game.prefix))
             SwingUtilities.invokeLater {
-                prefixSizeLabel.text = formatFileSize(prefixSize)
+                tableModel.setValueAt(formatFileSize(prefixSize), 4, 1)
             }
         }.start()
 
-        mainPanel.add(Box.createVerticalGlue())
-
+        val buttonPanel = JPanel()
         val closeButton = JButton("Close")
-        closeButton.alignmentX = Component.CENTER_ALIGNMENT
         closeButton.addActionListener { statsWindow.dispose() }
-        mainPanel.add(closeButton)
+        buttonPanel.add(closeButton)
+        mainPanel.add(buttonPanel, BorderLayout.SOUTH)
 
         statsWindow.contentPane.add(mainPanel)
         statsWindow.isVisible = true
