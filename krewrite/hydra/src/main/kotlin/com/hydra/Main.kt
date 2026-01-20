@@ -1,6 +1,7 @@
 package com.hydra
 
 import java.awt.*
+import java.awt.image.BufferedImage
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -21,7 +22,8 @@ data class Game(
     var protonVersion: String? = null,
     var protonPath: String? = null,
     var protonBin: String? = null,
-    var launchOptions: MutableMap<String, String> = mutableMapOf()
+    var launchOptions: MutableMap<String, String> = mutableMapOf(),
+    var imagePath: String? = null
 )
 
 data class PrefixInfo(
@@ -1208,6 +1210,323 @@ class GameItemWidget(
     }
 }
 
+class GameItemWidgetWithImage(
+    private val game: Game,
+    private val onLaunch: (Game) -> Unit,
+    private val onChangePrefix: (Game) -> Unit,
+    private val onProtonManager: (Game) -> Unit,
+    private val onPrefixManager: (Game) -> Unit,
+    private val onLaunchOptions: (Game) -> Unit
+) : JPanel() {
+
+    private val imageLabel = JLabel()
+
+    init {
+        initUI()
+    }
+
+    private fun initUI() {
+        layout = BoxLayout(this, BoxLayout.X_AXIS)
+        border = BorderFactory.createCompoundBorder(
+            LineBorder(Color(0xCC, 0xCC, 0xCC), 1, true),
+            EmptyBorder(5, 5, 5, 5)
+        )
+        background = Color(0x00, 0x00, 0x00)
+
+        updateImage()
+        imageLabel.preferredSize = Dimension(60, 60)
+        imageLabel.minimumSize = Dimension(60, 60)
+        imageLabel.maximumSize = Dimension(60, 60)
+        imageLabel.border = BorderFactory.createEtchedBorder()
+        add(imageLabel)
+        add(Box.createHorizontalStrut(5))
+
+        val infoPanel = JPanel()
+        infoPanel.layout = BoxLayout(infoPanel, BoxLayout.Y_AXIS)
+        infoPanel.isOpaque = false
+
+        val nameLabel = JLabel(game.name)
+        nameLabel.font = nameLabel.font.deriveFont(Font.BOLD, 10f)
+        nameLabel.foreground = Color.WHITE
+        infoPanel.add(nameLabel)
+
+        val prefixLabel = JLabel("Prefix: ${Paths.get(game.prefix).fileName}")
+        prefixLabel.font = prefixLabel.font.deriveFont(8f)
+        prefixLabel.foreground = Color.LIGHT_GRAY
+        infoPanel.add(prefixLabel)
+
+        add(infoPanel)
+        add(Box.createHorizontalGlue())
+
+        val loBtn = JButton("Params").apply {
+            preferredSize = Dimension(100, 28)
+            maximumSize = Dimension(100, 28)
+            toolTipText = "Launch Options"
+            addActionListener { onLaunchOptions(game) }
+        }
+        add(loBtn)
+        add(Box.createHorizontalStrut(5))
+
+        val wpmBtn = JButton("Winetricks").apply {
+            preferredSize = Dimension(100, 28)
+            maximumSize = Dimension(100, 28)
+            toolTipText = "Wineprefix Manager (Winetricks)"
+            addActionListener { onPrefixManager(game) }
+        }
+        add(wpmBtn)
+        add(Box.createHorizontalStrut(5))
+
+        val pmwBtn = JButton("Proton").apply {
+            preferredSize = Dimension(90, 28)
+            maximumSize = Dimension(90, 28)
+            toolTipText = "Proton Manager Window"
+            addActionListener { onProtonManager(game) }
+        }
+        add(pmwBtn)
+        add(Box.createHorizontalStrut(5))
+
+        val changePrefixBtn = JButton("Change Prefix").apply {
+            preferredSize = Dimension(120, 28)
+            maximumSize = Dimension(120, 28)
+            addActionListener { onChangePrefix(game) }
+        }
+        add(changePrefixBtn)
+        add(Box.createHorizontalStrut(5))
+
+        val launchBtn = JButton("Launch").apply {
+            preferredSize = Dimension(100, 28)
+            maximumSize = Dimension(100, 28)
+            font = font.deriveFont(Font.BOLD)
+            addActionListener { onLaunch(game) }
+        }
+        add(launchBtn)
+
+        setupContextMenu()
+        setupImageContextMenu()
+    }
+
+    private fun updateImage() {
+        if (game.imagePath != null) {
+            val imageFile = File(game.imagePath!!)
+            if (imageFile.exists()) {
+                try {
+                    val bufferedImage = javax.imageio.ImageIO.read(imageFile)
+                    val scaledImage = bufferedImage.getScaledInstance(60, 60, Image.SCALE_SMOOTH)
+                    imageLabel.icon = ImageIcon(scaledImage)
+                } catch (e: Exception) {
+                    imageLabel.icon = createPlaceholderIcon()
+                }
+            } else {
+                imageLabel.icon = createPlaceholderIcon()
+            }
+        } else {
+            imageLabel.icon = createPlaceholderIcon()
+        }
+    }
+
+    private fun createPlaceholderIcon(): Icon {
+        val placeholder = BufferedImage(60, 60, BufferedImage.TYPE_INT_ARGB)
+        val g2d = placeholder.createGraphics()
+        g2d.color = Color.GRAY
+        g2d.fillRect(0, 0, 60, 60)
+        g2d.color = Color.WHITE
+        g2d.drawLine(0, 0, 60, 60)
+        g2d.drawLine(60, 0, 0, 60)
+        g2d.dispose()
+        return ImageIcon(placeholder)
+    }
+
+    private fun setupImageContextMenu() {
+        val imagePopupMenu = JPopupMenu()
+
+        val updateArtItem = JMenuItem("Update Art").apply {
+            addActionListener {
+                updateArtFromGameDirectory()
+            }
+        }
+
+        val browseImageItem = JMenuItem("Browse for Image...").apply {
+            addActionListener {
+                browseForImage()
+            }
+        }
+
+        imagePopupMenu.add(updateArtItem)
+        imagePopupMenu.add(browseImageItem)
+
+        imageLabel.addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) {
+                if (e.isPopupTrigger) {
+                    imagePopupMenu.show(e.component, e.x, e.y)
+                }
+            }
+
+            override fun mouseReleased(e: java.awt.event.MouseEvent) {
+                if (e.isPopupTrigger) {
+                    imagePopupMenu.show(e.component, e.x, e.y)
+                }
+            }
+        })
+    }
+
+    private fun setupContextMenu() {
+        val popupMenu = JPopupMenu()
+
+        val openGameLocationItem = JMenuItem("Open game location").apply {
+            addActionListener {
+                openGameLocation()
+            }
+        }
+
+        val openPrefixLocationItem = JMenuItem("Open wine prefix location").apply {
+            addActionListener {
+                openPrefixLocation()
+            }
+        }
+
+        popupMenu.add(openGameLocationItem)
+        popupMenu.add(openPrefixLocationItem)
+
+        addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) {
+                if (e.isPopupTrigger) {
+                    popupMenu.show(e.component, e.x, e.y)
+                }
+            }
+
+            override fun mouseReleased(e: java.awt.event.MouseEvent) {
+                if (e.isPopupTrigger) {
+                    popupMenu.show(e.component, e.x, e.y)
+                }
+            }
+        })
+    }
+
+    private fun openGameLocation() {
+        val gameFile = File(game.executable)
+        val gameDirectory = gameFile.parentFile
+
+        if (gameDirectory != null && gameDirectory.exists()) {
+            try {
+                if (Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().open(gameDirectory)
+                } else {
+                    ProcessBuilder("xdg-open", gameDirectory.absolutePath).start()
+                }
+            } catch (e: Exception) {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to open game location: ${e.message}",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+                )
+            }
+        } else {
+            JOptionPane.showMessageDialog(
+                this,
+                "Game location not found: ${gameDirectory?.absolutePath ?: game.executable}",
+                "Error",
+                JOptionPane.ERROR_MESSAGE
+            )
+        }
+    }
+
+    private fun openPrefixLocation() {
+        val prefixDirectory = File(game.prefix)
+
+        if (prefixDirectory.exists()) {
+            try {
+                if (Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().open(prefixDirectory)
+                } else {
+                    ProcessBuilder("xdg-open", prefixDirectory.absolutePath).start()
+                }
+            } catch (e: Exception) {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to open wine prefix location: ${e.message}",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+                )
+            }
+        } else {
+            JOptionPane.showMessageDialog(
+                this,
+                "Wine prefix not found: ${game.prefix}",
+                "Error",
+                JOptionPane.ERROR_MESSAGE
+            )
+        }
+    }
+
+    private fun updateArtFromGameDirectory() {
+        val gameDir = File(game.executable).parentFile
+        if (gameDir != null && gameDir.exists()) {
+            val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "bmp", "webp")
+
+            val imageFiles = mutableListOf<File>()
+
+            fun searchImages(dir: File) {
+                dir.listFiles()?.forEach { file ->
+                    if (file.isDirectory) {
+                        searchImages(file)
+                    } else if (file.extension.lowercase() in imageExtensions) {
+                        imageFiles.add(file)
+                    }
+                }
+            }
+
+            searchImages(gameDir)
+
+            if (imageFiles.isNotEmpty()) {
+                val firstImage = imageFiles.first()
+                game.imagePath = firstImage.absolutePath
+                updateImage()
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Updated art to: ${firstImage.name}",
+                    "Art Updated",
+                    JOptionPane.INFORMATION_MESSAGE
+                )
+            } else {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "No image files found in the game directory.",
+                    "No Images Found",
+                    JOptionPane.INFORMATION_MESSAGE
+                )
+            }
+        } else {
+            JOptionPane.showMessageDialog(
+                this,
+                "Game directory not found.",
+                "Error",
+                JOptionPane.ERROR_MESSAGE
+            )
+        }
+    }
+
+    private fun browseForImage() {
+        val chooser = JFileChooser().apply {
+            fileFilter = javax.swing.filechooser.FileNameExtensionFilter(
+                "Image Files", "jpg", "jpeg", "png", "gif", "bmp", "webp"
+            )
+        }
+
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            val selectedFile = chooser.selectedFile
+            game.imagePath = selectedFile.absolutePath
+            updateImage()
+            JOptionPane.showMessageDialog(
+                this,
+                "Updated art to: ${selectedFile.name}",
+                "Art Updated",
+                JOptionPane.INFORMATION_MESSAGE
+            )
+        }
+    }
+}
+
 class GameLauncher : JFrame("Hydra") {
     private val games = mutableListOf<Game>()
     private var availablePrefixes = listOf<PrefixInfo>()
@@ -1273,26 +1592,26 @@ class GameLauncher : JFrame("Hydra") {
 
         leftButtonPanel.add(removeBtn)
         leftButtonPanel.add(rescanBtn)
-        
+
         val rightButtonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
-        
+
         val addBtn = JButton("Add Game").apply {
             preferredSize = Dimension(150, 35)
             font = font.deriveFont(Font.BOLD)
             addActionListener { addGame() }
         }
-        
+
         rightButtonPanel.add(addBtn)
-        
+
         buttonRowPanel.add(leftButtonPanel, BorderLayout.WEST)
         buttonRowPanel.add(rightButtonPanel, BorderLayout.EAST)
-        
+
         fullBottomPanel.add(buttonRowPanel, BorderLayout.NORTH)
-        
+
         val statusPanel = JPanel(BorderLayout())
         statusPanel.border = EmptyBorder(5, 10, 5, 10)
         statusPanel.add(statusLabel, BorderLayout.WEST)
-        
+
         fullBottomPanel.add(statusPanel, BorderLayout.SOUTH)
 
         mainPanel.add(fullBottomPanel, BorderLayout.SOUTH)
@@ -1362,7 +1681,7 @@ class GameLauncher : JFrame("Hydra") {
 
         games.forEach { game ->
             val gameWidget =
-                GameItemWidget(
+                GameItemWidgetWithImage(
                     game,
                     ::launchGame,
                     ::changeGamePrefix,
@@ -1370,7 +1689,7 @@ class GameLauncher : JFrame("Hydra") {
                     ::openPrefixManager,
                     ::openLaunchOptions
                 )
-            gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 60)
+            gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 70)
             gamesContainer.add(gameWidget)
             gamesContainer.add(Box.createVerticalStrut(5))
         }
@@ -1972,4 +2291,3 @@ fun main(args: Array<String>) {
         launcher.isVisible = true
     }
 }
-
