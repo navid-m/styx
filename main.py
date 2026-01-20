@@ -23,9 +23,12 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QFrame,
     QCheckBox,
+    QMenu,
+    QSizePolicy,
 )
 from PySide6.QtCore import Qt, QThread, Signal, QProcess, QTimer
-from PySide6.QtGui import QFont, QColor, QTextCursor
+from PySide6.QtGui import QFont, QTextCursor, QPixmap
+import requests
 
 
 class GameOutputWindow(QMainWindow):
@@ -414,7 +417,9 @@ class ProtonManagerDialog(QDialog):
         browse_layout.addWidget(browse_label)
 
         self.custom_path_input = QLineEdit()
-        self.custom_path_input.setPlaceholderText("Browse to custom Proton installation...")
+        self.custom_path_input.setPlaceholderText(
+            "Browse to custom Proton installation..."
+        )
         browse_layout.addWidget(self.custom_path_input)
 
         browse_btn = QPushButton("Browse...")
@@ -780,12 +785,27 @@ class GameItemWidget(QWidget):
     def __init__(self, game: Dict[str, str], parent=None):
         super().__init__(parent)
         self.game = game
+        self.image_label = None
         self.init_ui()
+        self.setup_context_menu()
 
     def init_ui(self):
         layout = QHBoxLayout()
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(10)
+
+        self.image_label = QLabel()
+        self.image_label.setFixedSize(60, 60)
+        self.image_label.setStyleSheet(
+            "border: 1px solid #ccc; background-color: #eee;"
+        )
+        self.image_label.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+        )
+
+        self.load_game_art()
+
+        layout.addWidget(self.image_label)
 
         info_layout = QVBoxLayout()
         info_layout.setSpacing(2)
@@ -850,14 +870,143 @@ class GameItemWidget(QWidget):
             "GameItemWidget { border: 1px solid #ccc; border-radius: 4px; background-color: #f9f9f9; }"
         )
 
+    def setup_context_menu(self):
+        """Setup right-click context menu"""
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
+    def show_context_menu(self, position):
+        """Show context menu with 'Update Art' option"""
+        menu = QMenu(self)
+
+        update_art_action = menu.addAction("Update Art")
+        update_art_action.triggered.connect(self.update_game_art)
+
+        menu.exec(self.mapToGlobal(position))
+
+    def load_game_art(self):
+        """Load game art from local file if available"""
+        pixmap = QPixmap(60, 60)
+        pixmap.fill(Qt.GlobalColor.lightGray)
+
+        game_name_clean = "".join(
+            c for c in self.game["name"] if c.isalnum() or c in (" ", "-", "_")
+        ).rstrip()
+        art_file_path = (
+            Path.home() / ".config" / "hydra" / "art" / f"{game_name_clean}.png"
+        )
+
+        if art_file_path.exists():
+            loaded_pixmap = QPixmap(str(art_file_path))
+            if not loaded_pixmap.isNull():
+                # Scale the image to fit while maintaining aspect ratio
+                scaled_pixmap = loaded_pixmap.scaled(
+                    60,
+                    60,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+                pixmap = scaled_pixmap
+
+        self.image_label.setPixmap(pixmap)
+
+    def update_game_art(self):
+        """Download and update game art from online sources"""
+        game_name = self.game["name"]
+
+        msg_box = QMessageBox()
+        msg_box.setWindowTitle("Updating Art")
+        msg_box.setText(f"Searching for art for '{game_name}'...")
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Cancel)
+        msg_box.show()
+
+        success = self.download_art_from_unsplash(game_name)
+
+        if not success:
+            success = self.download_art_from_pexels(game_name)
+
+        if not success:
+            success = self.download_art_from_pixabay(game_name)
+
+        if success:
+            msg_box.close()
+            self.load_game_art()
+            QMessageBox.information(self, "Success", f"Art updated for '{game_name}'!")
+        else:
+            msg_box.close()
+            QMessageBox.warning(
+                self, "Warning", f"Could not find art for '{game_name}'."
+            )
+
+    def download_art_from_unsplash(self, game_name):
+        """Download game art from Unsplash"""
+        try:
+            search_query = f"{game_name.replace(' ', '+')}+game"
+            url = f"https://source.unsplash.com/featured/?{search_query}"
+
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                self.save_game_art(response.content, game_name)
+                return True
+        except Exception as e:
+            print(f"Error downloading from Unsplash: {e}")
+
+        return False
+
+    def download_art_from_pexels(self, game_name):
+        """Download game art from Pexels (using their sample API)"""
+        try:
+            search_query = game_name.replace(" ", "%20")
+            url = f"https://picsum.photos/300/200?random={hash(game_name) % 10000}"
+
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                self.save_game_art(response.content, game_name)
+                return True
+        except Exception as e:
+            print(f"Error downloading from Pexels: {e}")
+
+        return False
+
+    def download_art_from_pixabay(self, game_name):
+        """Download game art from Pixabay (using their sample API)"""
+        try:
+            search_query = game_name.replace(" ", "%20")
+            url = f"https://picsum.photos/300/200?random={hash(game_name) % 10000 + 10000}"
+
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                self.save_game_art(response.content, game_name)
+                return True
+        except Exception as e:
+            print(f"Error downloading from Pixabay: {e}")
+
+        return False
+
+    def save_game_art(self, image_data, game_name):
+        """Save game art to local file"""
+        try:
+            art_dir = Path.home() / ".config" / "hydra" / "art"
+            art_dir.mkdir(parents=True, exist_ok=True)
+
+            clean_name = "".join(
+                c for c in game_name if c.isalnum() or c in (" ", "-", "_")
+            ).rstrip()
+            file_path = art_dir / f"{clean_name}.png"
+
+            with open(file_path, "wb") as f:
+                f.write(image_data)
+
+        except Exception as e:
+            print(f"Error saving game art: {e}")
+
     def setFrameStyle(self, style):
         """Make this widget have a frame"""
-        pass  # Handled by stylesheet
+        pass
 
     def update_game(self, game: Dict[str, str]):
         """Update the widget with new game data"""
         self.game = game
-        # Refresh the UI
         self.deleteLater()
 
 
@@ -1086,15 +1235,11 @@ class GameLauncher(QMainWindow):
         prefix_path = game["prefix"]
 
         if not os.path.exists(prefix_path):
-            QMessageBox.critical(
-                self, "Error", f"Wine prefix not found: {prefix_path}"
-            )
+            QMessageBox.critical(self, "Error", f"Wine prefix not found: {prefix_path}")
             return
 
         # Check if winetricks is installed
-        result = subprocess.run(
-            ["which", "winetricks"], capture_output=True, text=True
-        )
+        result = subprocess.run(["which", "winetricks"], capture_output=True, text=True)
 
         if result.returncode != 0:
             QMessageBox.warning(
@@ -1110,20 +1255,24 @@ class GameLauncher(QMainWindow):
 
         self.statusBar().showMessage(f"Launching Winetricks for {game['name']}...")
 
-        # Launch winetricks in a separate thread
         def run_winetricks():
             try:
                 env = os.environ.copy()
                 env["WINEPREFIX"] = prefix_path
 
                 process = subprocess.Popen(
-                    ["winetricks"], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    ["winetricks"],
+                    env=env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
 
                 process.wait()
 
                 if process.returncode == 0:
-                    self.statusBar().showMessage(f"Winetricks closed for {game['name']}")
+                    self.statusBar().showMessage(
+                        f"Winetricks closed for {game['name']}"
+                    )
                 else:
                     self.statusBar().showMessage(
                         f"Winetricks exited with code {process.returncode} for {game['name']}"
@@ -1136,6 +1285,7 @@ class GameLauncher(QMainWindow):
                 self.statusBar().showMessage("Failed to launch Winetricks")
 
         import threading
+
         thread = threading.Thread(target=run_winetricks, daemon=True)
         thread.start()
 
@@ -1213,13 +1363,17 @@ class GameLauncher(QMainWindow):
         output_window.append_output(f"Executable: {exe_path}")
         output_window.append_output(f"Working Directory: {Path(exe_path).parent}")
         output_window.append_output(f"Wine Prefix: {prefix_path}")
-        
+
         use_proton = game.get("proton_bin") is not None
         if use_proton:
             proton_version = game.get("proton_version", "Unknown")
-            output_window.append_output(f"Compatibility Layer: {proton_version}", "#00aa00")
+            output_window.append_output(
+                f"Compatibility Layer: {proton_version}", "#00aa00"
+            )
         else:
-            output_window.append_output("Compatibility Layer: Wine (default)", "#00aa00")
+            output_window.append_output(
+                "Compatibility Layer: Wine (default)", "#00aa00"
+            )
 
         if os.path.exists(prefix_path):
             system_reg = Path(prefix_path) / "system.reg"
@@ -1242,7 +1396,9 @@ class GameLauncher(QMainWindow):
 
             if use_proton:
                 env.append(f"STEAM_COMPAT_DATA_PATH={prefix_path}")
-                env.append(f"STEAM_COMPAT_CLIENT_INSTALL_PATH={game.get('proton_path', '')}")
+                env.append(
+                    f"STEAM_COMPAT_CLIENT_INSTALL_PATH={game.get('proton_path', '')}"
+                )
 
             if output_window.verbose_checkbox.isChecked():
                 env.append("WINEDEBUG=+all")
@@ -1261,7 +1417,10 @@ class GameLauncher(QMainWindow):
             output_window.append_output("")
             output_window.append_output("=== Environment Variables ===", "#0066cc")
             for var in env:
-                if any(var.startswith(prefix) for prefix in ["WINE", "DISPLAY", "STEAM_COMPAT"]):
+                if any(
+                    var.startswith(prefix)
+                    for prefix in ["WINE", "DISPLAY", "STEAM_COMPAT"]
+                ):
                     output_window.append_output(f"  {var}")
             output_window.append_output("")
 
@@ -1300,7 +1459,9 @@ class GameLauncher(QMainWindow):
 
             if use_proton:
                 proton_bin = game.get("proton_bin")
-                output_window.append_output("=== Starting Proton Process ===", "#0066cc")
+                output_window.append_output(
+                    "=== Starting Proton Process ===", "#0066cc"
+                )
                 output_window.append_output(f"Command: {proton_bin} run {exe_path_abs}")
                 output_window.append_output("")
 
