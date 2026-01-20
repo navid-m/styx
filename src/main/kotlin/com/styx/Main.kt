@@ -22,7 +22,9 @@ import com.formdev.flatlaf.themes.FlatMacDarkLaf
 class GameOutputWindow(
     private val gameName: String,
     parent: JFrame? = null,
-    private val onAbort: ((String) -> Unit)? = null
+    private val onAbort: ((String) -> Unit)? = null,
+    private val prefixPath: String? = null,
+    private val useProton: Boolean = false
 ) : JFrame("Game Output - $gameName") {
     private val outputText = JTextArea()
     private val verboseCheckbox = JCheckBox("Verbose Mode (show all Wine debug)", false)
@@ -80,6 +82,15 @@ class GameOutputWindow(
             }
         }
         buttonPanel.add(abortBtn)
+
+        if (prefixPath != null) {
+            val killServerBtn = JButton("Kill Wineserver").apply {
+                preferredSize = Dimension(130, 32)
+                toolTipText = "Kill wineserver for this prefix (fixes version mismatch)"
+                addActionListener { killWineserver() }
+            }
+            buttonPanel.add(killServerBtn)
+        }
 
         val saveBtn = JButton("Save Log").apply {
             preferredSize = Dimension(100, 32)
@@ -212,6 +223,51 @@ class GameOutputWindow(
                 )
             }
         }
+    }
+
+    private fun killWineserver() {
+        if (prefixPath == null) return
+        
+        Thread {
+            try {
+                appendOutput("")
+                appendOutput("═".repeat(60), "#0066cc")
+                appendOutput("KILLING WINESERVER FOR PREFIX", "#0066cc")
+                appendOutput("═".repeat(60), "#0066cc")
+                appendOutput("Prefix: $prefixPath")
+                appendOutput("")
+                
+                val pb = ProcessBuilder()
+                val env = pb.environment()
+                env["WINEPREFIX"] = prefixPath
+                
+                if (useProton) {
+                    env["STEAM_COMPAT_DATA_PATH"] = prefixPath
+                    appendOutput("Using Proton environment for wineserver", "#00aa00")
+                }
+                
+                pb.command("wineserver", "-k")
+                appendOutput("Command: wineserver -k")
+                appendOutput("")
+                
+                val process = pb.start()
+                val exitCode = process.waitFor()
+                
+                appendOutput("")
+                if (exitCode == 0) {
+                    appendOutput("✓ Wineserver killed successfully", "#008800")
+                    appendOutput("You can now launch the game", "#008800")
+                } else {
+                    appendOutput("⚠ Wineserver command exited with code: $exitCode", "#cc6600")
+                    appendOutput("This may be normal if no wineserver was running", "#cc6600")
+                }
+                appendOutput("═".repeat(60), "#0066cc")
+                appendOutput("")
+            } catch (e: Exception) {
+                appendOutput("ERROR killing wineserver: ${e.message}", "#cc0000")
+                e.printStackTrace()
+            }
+        }.start()
     }
 
     fun isVerboseMode(): Boolean = verboseCheckbox.isSelected
@@ -423,6 +479,18 @@ class ChangePrefixDialog(
 
         prefixPanel.add(browseBtn)
         newGroup.add(prefixPanel)
+        
+        if (game.protonPath != null) {
+            val protonPrefixPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
+            val useProtonPrefixBtn = JButton("Use Proton Wineprefix").apply {
+                preferredSize = Dimension(180, 32)
+                toolTipText = "Set this game to use its Proton compatdata wineprefix"
+                addActionListener { useProtonCompatdataPrefix() }
+            }
+            protonPrefixPanel.add(useProtonPrefixBtn)
+            newGroup.add(protonPrefixPanel)
+        }
+        
         mainPanel.add(newGroup)
         mainPanel.add(Box.createVerticalStrut(10))
 
@@ -483,6 +551,96 @@ class ChangePrefixDialog(
 
         newPrefix = newPrefixPath
         dispose()
+    }
+    
+    private fun useProtonCompatdataPrefix() {
+        val protonPath = game.protonPath ?: return
+        val home = Paths.get(System.getProperty("user.home"))
+        val compatdataLocations = listOf(
+            home.resolve(".steam/steam/steamapps/compatdata"),
+            home.resolve(".local/share/Steam/steamapps/compatdata")
+        )
+        
+        var foundPrefix: String? = null
+        for (compatdataPath in compatdataLocations) {
+            if (Files.exists(compatdataPath)) {
+                try {
+                    Files.list(compatdataPath).use { stream ->
+                        stream.filter { Files.isDirectory(it) }
+                            .forEach { prefixDir ->
+                                val pfxPath = prefixDir.resolve("pfx")
+                                if (Files.exists(pfxPath)) {
+                                    if (pfxPath.toString() == game.prefix) {
+                                        foundPrefix = pfxPath.toString()
+                                        return@forEach
+                                    }
+                                }
+                            }
+                    }
+                } catch (e: Exception) {
+                    // Continue searching
+                }
+            }
+        }
+        
+        if (foundPrefix == null) {
+            val protonPrefixes = mutableListOf<PrefixInfo>()
+            for (compatdataPath in compatdataLocations) {
+                if (Files.exists(compatdataPath)) {
+                    try {
+                        Files.list(compatdataPath).use { stream ->
+                            stream.filter { Files.isDirectory(it) }
+                                .forEach { prefixDir ->
+                                    val pfxPath = prefixDir.resolve("pfx")
+                                    if (Files.exists(pfxPath)) {
+                                        protonPrefixes.add(
+                                            PrefixInfo("Proton - ${prefixDir.fileName}", pfxPath.toString())
+                                        )
+                                    }
+                                }
+                        }
+                    } catch (e: Exception) {
+                        // Continue
+                    }
+                }
+            }
+            
+            if (protonPrefixes.isEmpty()) {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "No Proton compatdata prefixes found.\nProton prefixes are typically created when a game runs with Proton.",
+                    "No Proton Prefixes",
+                    JOptionPane.INFORMATION_MESSAGE
+                )
+                return
+            }
+            
+            val selected = JOptionPane.showInputDialog(
+                this,
+                "Select a Proton compatdata prefix:",
+                "Choose Proton Prefix",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                protonPrefixes.map { it.name }.toTypedArray(),
+                protonPrefixes[0].name
+            ) as? String
+            
+            if (selected != null) {
+                foundPrefix = protonPrefixes.find { it.name == selected }?.path
+            }
+        }
+        
+        if (foundPrefix != null) {
+            prefixCombo.addItem(PrefixComboItem("Proton Compatdata", foundPrefix!!))
+            prefixCombo.selectedIndex = prefixCombo.itemCount - 1
+            
+            JOptionPane.showMessageDialog(
+                this,
+                "Proton wineprefix selected. Click 'Change Prefix' to apply.",
+                "Prefix Selected",
+                JOptionPane.INFORMATION_MESSAGE
+            )
+        }
     }
 
     data class PrefixComboItem(val name: String, val path: String) {
@@ -1626,6 +1784,8 @@ class GameItemWidgetWithImage(
             arrayOf("Time Played", formatTimePlayed(game.timePlayed)),
             arrayOf("Times Opened", game.timesOpened.toString()),
             arrayOf("Times Crashed", game.timesCrashed.toString()),
+            arrayOf("Wineprefix Path", game.prefix),
+            arrayOf("Compatibility Layer", game.protonVersion ?: "Wine (default)"),
             arrayOf("Game Size", "Calculating..."),
             arrayOf("Wine Prefix Size", "Calculating...")
         )
@@ -1638,6 +1798,28 @@ class GameItemWidgetWithImage(
         table.setShowGrid(true)
         table.gridColor = java.awt.Color(220, 220, 220)
         table.setEnabled(false)
+        
+        table.setDefaultRenderer(Any::class.java, object : javax.swing.table.DefaultTableCellRenderer() {
+            override fun getTableCellRendererComponent(
+                table: JTable,
+                value: Any?,
+                isSelected: Boolean,
+                hasFocus: Boolean,
+                row: Int,
+                column: Int
+            ): java.awt.Component {
+                val cell = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column)
+                if (row == 3) {
+                    cell.background = java.awt.Color(255, 255, 200)
+                    cell.font = cell.font.deriveFont(Font.BOLD)
+                } else if (row == 4) {
+                    cell.background = java.awt.Color(230, 240, 255)
+                } else {
+                    cell.background = java.awt.Color.WHITE
+                }
+                return cell
+            }
+        })
 
         val scrollPane = JScrollPane(table)
         mainPanel.add(scrollPane, BorderLayout.CENTER)
@@ -1645,14 +1827,14 @@ class GameItemWidgetWithImage(
         Thread {
             val gameSize = calculateDirectorySize(File(game.executable).parentFile)
             SwingUtilities.invokeLater {
-                tableModel.setValueAt(formatFileSize(gameSize), 3, 1)
+                tableModel.setValueAt(formatFileSize(gameSize), 5, 1)
             }
         }.start()
 
         Thread {
             val prefixSize = calculateDirectorySize(File(game.prefix))
             SwingUtilities.invokeLater {
-                tableModel.setValueAt(formatFileSize(prefixSize), 4, 1)
+                tableModel.setValueAt(formatFileSize(prefixSize), 6, 1)
             }
         }.start()
 
@@ -1931,8 +2113,18 @@ class GameLauncher : JFrame("Styx") {
             addActionListener { scanPrefixes() }
         }
 
+        val killAllServersBtn = JButton("Kill All Wineservers").apply {
+            preferredSize = Dimension(170, 32)
+            background = Color(0xCC, 0x00, 0x00)
+            foreground = Color.WHITE
+            font = font.deriveFont(Font.BOLD)
+            toolTipText = "Terminate all wineserver processes (fixes version mismatches)"
+            addActionListener { killAllWineservers() }
+        }
+
         leftButtonPanel.add(removeBtn)
         leftButtonPanel.add(rescanBtn)
+        leftButtonPanel.add(killAllServersBtn)
 
         val rightButtonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
 
@@ -1987,6 +2179,63 @@ class GameLauncher : JFrame("Styx") {
                 availablePrefixes = scanner.get()
                 statusLabel.text = "Found ${availablePrefixes.size} Wine/Proton prefix(es)"
             }
+        }
+    }
+
+    private fun killAllWineservers() {
+        val result = JOptionPane.showConfirmDialog(
+            this,
+            "This will terminate ALL running wineserver processes on your system.\n\n" +
+            "This is useful to fix version mismatches but will affect:\n" +
+            "• All Wine/Proton games currently running\n" +
+            "• Any Wine applications in use\n\n" +
+            "Continue?",
+            "Warning: Kill All Wineservers",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        )
+
+        if (result == JOptionPane.YES_OPTION) {
+            Thread {
+                try {
+                    statusLabel.text = "Killing all wineservers..."
+                    
+                    val pb = ProcessBuilder("bash", "-c", "pgrep -x wineserver | xargs -r kill -9")
+                    val process = pb.start()
+                    val exitCode = process.waitFor()
+                    
+                    SwingUtilities.invokeLater {
+                        if (exitCode == 0 || exitCode == 123) {
+                            statusLabel.text = "All wineservers terminated"
+                            JOptionPane.showMessageDialog(
+                                this,
+                                "All wineserver processes have been terminated.\n" +
+                                "You can now launch games with a fresh Wine environment.",
+                                "Success",
+                                JOptionPane.INFORMATION_MESSAGE
+                            )
+                        } else {
+                            statusLabel.text = "Wineserver cleanup completed"
+                            JOptionPane.showMessageDialog(
+                                this,
+                                "Wineserver cleanup completed.",
+                                "Info",
+                                JOptionPane.INFORMATION_MESSAGE
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    SwingUtilities.invokeLater {
+                        statusLabel.text = "Error killing wineservers"
+                        JOptionPane.showMessageDialog(
+                            this,
+                            "Failed to kill wineservers: ${e.message}",
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                        )
+                    }
+                }
+            }.start()
         }
     }
 
@@ -2384,9 +2633,11 @@ class GameLauncher : JFrame("Styx") {
             return
         }
 
-        val outputWindow = GameOutputWindow(gameName, this) { abortGameName ->
-            abortGameLaunch(abortGameName)
-        }
+        val outputWindow = GameOutputWindow(
+            gameName = gameName,
+            parent = this,
+            onAbort = { abortGameName -> abortGameLaunch(abortGameName) }
+        )
         outputWindows[gameName] = outputWindow
         outputWindow.isVisible = true
 
@@ -2480,9 +2731,11 @@ class GameLauncher : JFrame("Styx") {
         val steamAppId = game.executable
         val gameName = game.name
 
-        val outputWindow = GameOutputWindow(gameName, this) { abortGameName ->
-            abortGameLaunch(abortGameName)
-        }
+        val outputWindow = GameOutputWindow(
+            gameName = gameName,
+            parent = this,
+            onAbort = { abortGameName -> abortGameLaunch(abortGameName) }
+        )
         outputWindows[gameName] = outputWindow
         outputWindow.isVisible = true
 
@@ -2570,9 +2823,13 @@ class GameLauncher : JFrame("Styx") {
             return
         }
 
-        val outputWindow = GameOutputWindow(gameName, this) { abortGameName ->
-            abortGameLaunch(abortGameName)
-        }
+        val outputWindow = GameOutputWindow(
+            gameName = gameName,
+            parent = this,
+            onAbort = { abortGameName -> abortGameLaunch(abortGameName) },
+            prefixPath = prefixPath,
+            useProton = game.protonBin != null
+        )
         outputWindows[gameName] = outputWindow
         outputWindow.isVisible = true
 
@@ -2653,6 +2910,23 @@ class GameLauncher : JFrame("Styx") {
                     "Custom launch options: ${game.launchOptions.size ?: 0} variable(s)",
                     "#00aa00"
                 )
+            }
+            outputWindow.appendOutput("")
+
+            outputWindow.appendOutput("=== Cleaning up old wineserver ===", "#0066cc")
+            try {
+                val killServerPB = ProcessBuilder()
+                val killEnv = killServerPB.environment()
+                killEnv["WINEPREFIX"] = prefixPath
+                if (useProton) {
+                    killEnv["STEAM_COMPAT_DATA_PATH"] = prefixPath
+                }
+                killServerPB.command("wineserver", "-k")
+                val killProcess = killServerPB.start()
+                killProcess.waitFor()
+                outputWindow.appendOutput("Terminated any existing wineserver for this prefix", "#008800")
+            } catch (e: Exception) {
+                outputWindow.appendOutput("Note: wineserver cleanup skipped (${e.message})", "#cc6600")
             }
             outputWindow.appendOutput("")
 
