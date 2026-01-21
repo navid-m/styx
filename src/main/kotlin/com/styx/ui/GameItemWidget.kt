@@ -42,7 +42,7 @@ import javax.swing.table.DefaultTableCellRenderer
 import javax.swing.table.DefaultTableModel
 import kotlin.math.min
 
-class GameItemWidgetWithImage(
+class GameItemWidget(
     private val game: Game,
     private val launcher: GameLauncher,
     private val onLaunch: (Game) -> Unit,

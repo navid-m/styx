@@ -501,7 +501,7 @@ class GameLauncher : JFrame("Styx") {
             }
 
             gamesInCategory.forEach { game ->
-                val gameWidget = GameItemWidgetWithImage(
+                val gameWidget = GameItemWidget(
                     game,
                     this,
                     ::launchGame,
