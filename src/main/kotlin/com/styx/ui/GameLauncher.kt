@@ -194,7 +194,7 @@ class GameLauncher : JFrame("Styx") {
         val statusPanel = JPanel(BorderLayout())
         statusPanel.border = BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(1, 0, 0, 0, Color(60, 63, 65)),
-            EmptyBorder(8, 10, 5, 10)
+            EmptyBorder(12, 10, 5, 10)
         )
         statusPanel.add(statusLabel, BorderLayout.WEST)
         fullBottomPanel.add(statusPanel, BorderLayout.SOUTH)
