@@ -18,7 +18,6 @@ import javax.swing.JTextField
 import javax.swing.border.EmptyBorder
 
 class AddNativeGameDialog(private val launcher: GameLauncher) : JDialog(launcher, "Add Native Linux Game", true) {
-
     private val nameInput = JTextField(30)
     private val exeInput = JTextField(30)
     var gameData: Game? = null
