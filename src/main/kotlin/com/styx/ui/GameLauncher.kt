@@ -246,7 +246,13 @@ class GameLauncher : JFrame("Styx") {
         toolsMenu.add(settingsItem)
         toolsMenu.addSeparator()
 
-        val wineserverMgmtItem = JMenuItem("Wineserver Management").apply {
+        val wineprefixMgrItem = JMenuItem("Wineprefix Manager").apply {
+            addActionListener { openWineprefixManager() }
+            accelerator = KeyStroke.getKeyStroke("control L")
+        }
+        toolsMenu.add(wineprefixMgrItem)
+
+        val wineserverMgmtItem = JMenuItem("Wineserver Manager").apply {
             addActionListener { openWineserverManagement() }
             accelerator = KeyStroke.getKeyStroke("control K")
         }
@@ -308,7 +314,12 @@ class GameLauncher : JFrame("Styx") {
     }
 
     private fun openWineserverManagement() {
-        val window = WineserverManagementWindow(this)
+        val window = WineserverManagerWindow(this)
+        window.isVisible = true
+    }
+
+    private fun openWineprefixManager() {
+        val window = WineprefixManagerWindow(this)
         window.isVisible = true
     }
 

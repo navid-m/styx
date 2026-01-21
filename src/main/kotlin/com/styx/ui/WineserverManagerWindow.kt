@@ -24,7 +24,7 @@ import javax.swing.table.DefaultTableModel
  * Wineserver Management Window
  * Displays running wineserver processes and allows killing them
  */
-class WineserverManagementWindow(parent: JFrame? = null) : JFrame("Wineserver Management") {
+class WineserverManagerWindow(parent: JFrame? = null) : JFrame("Wineserver Management") {
     private val tableModel = DefaultTableModel(arrayOf("PID", "Command", "User"), 0)
     private val table = JTable(tableModel)
     private var refreshTimer: Timer? = null
