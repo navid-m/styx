@@ -164,8 +164,8 @@ class GameLauncher : JFrame("Styx") {
 
         val rightButtonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
 
-        val addBtn = JButton("Add").apply {
-            preferredSize = Dimension(100, 32)
+        val addBtn = JButton("Add...").apply {
+            preferredSize = Dimension(110, 32)
             toolTipText = "Add Game"
             addActionListener { showAddGameMenu(this) }
         }
