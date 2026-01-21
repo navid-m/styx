@@ -14,7 +14,6 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
     private val timePlayedColorPanel = JPanel()
     private val metadataColorPanel = JPanel()
     private val globalFlagsArea = JTextArea(5, 40)
-    
     private var currentSettings = GlobalSettings()
 
     init {
