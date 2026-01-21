@@ -154,7 +154,7 @@ class AddGameDialog(
         val exePath = exeInput.text.trim()
         val selected = prefixCombo.selectedItem as? PrefixComboItem
         val prefixPath = selected?.path
-        val steamAppId = steamAppIdInput.text.trim().takeIf { it.isNotEmpty() }
+        var steamAppId = steamAppIdInput.text.trim().takeIf { it.isNotEmpty() }
 
         if (name.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Enter a game name.", "Invalid Input", JOptionPane.WARNING_MESSAGE)
@@ -181,6 +181,17 @@ class AddGameDialog(
             return
         }
 
+        if (steamAppId == null) {
+            try {
+                val results = SteamApiHelper.searchGameByName(name)
+                if (results.isNotEmpty()) {
+                    steamAppId = results[0].appid
+                }
+            } catch (e: Exception) {
+                // Ignore.
+            }
+        }
+
         gameData = Game(name, exePath, prefixPath, steamAppId = steamAppId)
         dispose()
     }
@@ -190,7 +201,7 @@ class AddGameDialog(
         if (gameName.isEmpty()) {
             JOptionPane.showMessageDialog(
                 this,
-                "Please enter a game name first.",
+                "Enter a game name first.",
                 "No Game Name",
                 JOptionPane.WARNING_MESSAGE
             )

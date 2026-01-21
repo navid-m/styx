@@ -945,7 +945,17 @@ class AddNativeGameDialog(private val launcher: GameLauncher) : JDialog(launcher
             return
         }
 
-        gameData = Game(name, exePath, "", type = GameType.NATIVE_LINUX)
+        var steamAppId: String? = null
+        try {
+            val results = SteamApiHelper.searchGameByName(name)
+            if (results.isNotEmpty()) {
+                steamAppId = results[0].appid
+            }
+        } catch (e: Exception) {
+            // Ignore.
+        }
+
+        gameData = Game(name, exePath, "", type = GameType.NATIVE_LINUX, steamAppId = steamAppId)
         dispose()
     }
 }
