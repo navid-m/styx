@@ -188,7 +188,6 @@ class GameLauncher : JFrame("Styx") {
 
         buttonRowPanel.add(leftButtonPanel, BorderLayout.WEST)
         buttonRowPanel.add(rightButtonPanel, BorderLayout.EAST)
-
         fullBottomPanel.add(buttonRowPanel, BorderLayout.NORTH)
 
         val statusPanel = JPanel(BorderLayout())
