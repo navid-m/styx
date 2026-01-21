@@ -16,9 +16,8 @@ import javax.swing.BorderFactory
 import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.JButton
-import javax.swing.JCheckBox
+import javax.swing.JComboBox
 import javax.swing.JDialog
-import javax.swing.JFrame
 import javax.swing.JLabel
 import javax.swing.JOptionPane
 import javax.swing.JPanel
@@ -36,7 +35,15 @@ class GameConfigDialog(
     private val onRename: (Game) -> Unit
 ) : JDialog(launcher, "Configure - ${game.name}", true) {
 
-    private val verboseCheckbox = JCheckBox("Enable Verbose Logging (show all Wine debug)", game.verboseLogging)
+    private val wineLogLevels = mapOf(
+        "Disabled (-all)" to "-all",
+        "Errors Only (err+all)" to "err+all",
+        "Warnings (warn+all)" to "warn+all",
+        "Default (warn+all,fixme-all)" to "warn+all,fixme-all",
+        "Verbose (+all)" to "+all"
+    )
+    
+    private val logLevelComboBox = JComboBox(wineLogLevels.keys.toTypedArray())
     private val steamAppIdInput = JTextField(20)
 
     init {
@@ -44,7 +51,7 @@ class GameConfigDialog(
     }
 
     private fun initUI() {
-        minimumSize = Dimension(450, 400)
+        minimumSize = Dimension(450, 450)
 
         val mainPanel = JPanel()
         mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
@@ -58,16 +65,28 @@ class GameConfigDialog(
 
         val loggingPanel = JPanel()
         loggingPanel.layout = BoxLayout(loggingPanel, BoxLayout.Y_AXIS)
-        loggingPanel.border = BorderFactory.createTitledBorder("Logging Options")
+        loggingPanel.border = BorderFactory.createTitledBorder("Wine Debug Level")
         loggingPanel.alignmentX = LEFT_ALIGNMENT
 
-        verboseCheckbox.alignmentX = LEFT_ALIGNMENT
-        verboseCheckbox.toolTipText = "When enabled, shows all Wine debug output for this game"
-        loggingPanel.add(verboseCheckbox)
+        val logLevelPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
+        logLevelPanel.add(JLabel("Log Level:"))
+        
+        val currentLogLevel = if (game.verboseLogging) {
+            "+all"
+        } else {
+            game.wineLogLevel
+        }
+        
+        wineLogLevels.entries.find { it.value == currentLogLevel }?.let { entry ->
+            logLevelComboBox.selectedItem = entry.key
+        }
+        
+        logLevelPanel.add(logLevelComboBox)
+        loggingPanel.add(logLevelPanel)
         loggingPanel.add(Box.createVerticalStrut(5))
 
         val loggingInfoLabel =
-            JLabel("<html><small>Verbose logging can help diagnose issues but generates a lot of output</small></html>")
+            JLabel("<html><small>Higher log levels generate more output but can help diagnose issues</small></html>")
         loggingInfoLabel.foreground = Color(0x88, 0x88, 0x88)
         loggingInfoLabel.alignmentX = LEFT_ALIGNMENT
         loggingPanel.add(loggingInfoLabel)
@@ -227,7 +246,9 @@ class GameConfigDialog(
         val saveBtn = JButton("Save").apply {
             preferredSize = Dimension(80, 32)
             addActionListener {
-                game.verboseLogging = verboseCheckbox.isSelected
+                val selectedLogLevel = logLevelComboBox.selectedItem as? String
+                game.wineLogLevel = wineLogLevels[selectedLogLevel] ?: "warn+all,fixme-all"
+                game.verboseLogging = false
                 game.steamAppId = steamAppIdInput.text.trim().takeIf { it.isNotEmpty() }
                 dispose()
             }

@@ -33,10 +33,12 @@ class GameOutputWindow(
     private val onAbort: ((String) -> Unit)? = null,
     private val prefixPath: String? = null,
     private val useProton: Boolean = false,
-    private val verboseLogging: Boolean = false
+    private val verboseLogging: Boolean = false,
+    private val wineLogLevel: String = "warn+all,fixme-all"
 ) : JFrame("Game Output - $gameName") {
     private val outputText = JTextArea()
-    private val hideDebugCheckbox = JCheckBox("Hide Wine debug output (improves performance)", !verboseLogging)
+    private val isOutputDisabled = wineLogLevel == "-all"
+    private val hideDebugCheckbox = JCheckBox("Hide Wine debug output (improves performance)", isOutputDisabled)
     private val abortBtn = JButton("Abort Launch")
     private val maxDisplayLines = 5000
     private val fullLogBuffer = mutableListOf<String>()
@@ -147,8 +149,13 @@ class GameOutputWindow(
         SwingUtilities.invokeLater {
             if (!isClosing) {
                 if (hideDebugCheckbox.isSelected) {
-                    outputText.text =
-                        "\n\n    (Tumbleweed)\n\n    All output is hidden.\n\n    To re-enable logs, go to the game configuration."
+                    if (isOutputDisabled) {
+                        outputText.text =
+                            "\n\n    (Tumbleweed)\n\n    Output logging is disabled (WINEDEBUG=-all).\n\n    To enable logs, change the Wine log level in the game configuration."
+                    } else {
+                        outputText.text =
+                            "\n\n    All output is hidden for performance.\n\n    Uncheck the box above to view output."
+                    }
                 } else {
                     synchronized(displayBuffer) {
                         val linesToDisplay = displayBuffer.takeLast(maxDisplayLines)

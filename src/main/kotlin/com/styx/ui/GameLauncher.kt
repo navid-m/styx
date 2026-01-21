@@ -326,7 +326,7 @@ class GameLauncher : JFrame("Styx") {
     private fun showAboutDialog() {
         val message = """
             <html>
-            <h2>Styx v0.0.2</h2>
+            <h2>Styx v0.0.3</h2>
             <p>A game launcher for Linux</p>
             <br />
             <p>By Navid M</p>
@@ -1112,7 +1112,8 @@ class GameLauncher : JFrame("Styx") {
             gameName = gameName,
             parent = this,
             onAbort = { abortGameName -> abortGameLaunch(abortGameName) },
-            verboseLogging = game.verboseLogging
+            verboseLogging = game.verboseLogging,
+            wineLogLevel = if (game.verboseLogging) "+all" else game.wineLogLevel
         )
         outputWindows[gameName] = outputWindow
         outputWindow.isVisible = true
@@ -1211,7 +1212,8 @@ class GameLauncher : JFrame("Styx") {
             gameName = gameName,
             parent = this,
             onAbort = { abortGameName -> abortGameLaunch(abortGameName) },
-            verboseLogging = game.verboseLogging
+            verboseLogging = game.verboseLogging,
+            wineLogLevel = if (game.verboseLogging) "+all" else game.wineLogLevel
         )
         outputWindows[gameName] = outputWindow
         outputWindow.isVisible = true
@@ -1308,7 +1310,8 @@ class GameLauncher : JFrame("Styx") {
             onAbort = { abortGameName -> abortGameLaunch(abortGameName) },
             prefixPath = prefixPath,
             useProton = game.protonBin != null,
-            verboseLogging = game.verboseLogging
+            verboseLogging = game.verboseLogging,
+            wineLogLevel = if (game.verboseLogging) "+all" else game.wineLogLevel
         )
         outputWindows[gameName] = outputWindow
         outputWindow.isVisible = true
@@ -1366,13 +1369,14 @@ class GameLauncher : JFrame("Styx") {
                 env[key] = value
             }
 
-            if (game.verboseLogging) {
-                env["WINEDEBUG"] = "+all"
-                outputWindow.appendOutput("Verbose mode enabled: WINEDEBUG=+all", "#0066cc")
+            // Set Wine debug level based on game configuration
+            val debugLevel = if (game.verboseLogging) {
+                "+all"  // Backwards compatibility for old saves
             } else {
-                env["WINEDEBUG"] = "warn+all,fixme-all"
-                outputWindow.appendOutput("Debug mode: WINEDEBUG=warn+all,fixme-all", "#0066cc")
+                game.wineLogLevel
             }
+            env["WINEDEBUG"] = debugLevel
+            outputWindow.appendOutput("Wine debug level: WINEDEBUG=$debugLevel", "#0066cc")
 
             env["WINEDLLOVERRIDES"] = "winemenubuilder.exe=d"
             env["DISPLAY"] = ":0"
