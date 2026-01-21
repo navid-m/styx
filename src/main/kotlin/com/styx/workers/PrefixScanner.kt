@@ -18,9 +18,7 @@ class PrefixScanner : SwingWorker<List<PrefixInfo>, Void>() {
     private fun scanWinePrefixes(): List<PrefixInfo> {
         val prefixes = mutableListOf<PrefixInfo>()
         val seenPaths = mutableSetOf<String>()
-
         val startTime = System.currentTimeMillis()
-
         val home = Paths.get(System.getProperty("user.home"))
         val commonLocations = listOf(
             home.resolve(".steam/steam/steamapps/compatdata"),
