@@ -1,6 +1,10 @@
 package com.styx
 
 import java.awt.*
+import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.Transferable
+import java.awt.datatransfer.UnsupportedFlavorException
+import java.awt.dnd.*
 import java.awt.image.BufferedImage
 import java.io.File
 import java.nio.file.Files
@@ -2377,11 +2381,14 @@ fun formatTimePlayed(minutes: Long): String {
 
 class GameLauncher : JFrame("Styx") {
     private val games = mutableListOf<Game>()
+    private val categories = mutableListOf<String>()
     private var availablePrefixes = listOf<PrefixInfo>()
     private val configFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "games.json")
+    private val categoriesFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "categories.json")
     private val gameProcesses = mutableMapOf<String, Process>()
     private val outputWindows = mutableMapOf<String, GameOutputWindow>()
-    private val gamesContainer = JPanel()
+    private val tabbedPane = JTabbedPane()
+    private val categoryPanels = mutableMapOf<String, JPanel>()
     private val statusLabel = JLabel("Ready")
     private val logReaderThreads = mutableListOf<Thread>()
     private val gameStartTimes = mutableMapOf<String, Long>()
@@ -2394,6 +2401,7 @@ class GameLauncher : JFrame("Styx") {
 
     init {
         initUI()
+        loadCategories()
         loadGames()
         scanPrefixes()
 
@@ -2455,14 +2463,8 @@ class GameLauncher : JFrame("Styx") {
         topPanel.add(searchPanel, BorderLayout.SOUTH)
         mainPanel.add(topPanel, BorderLayout.NORTH)
 
-        gamesContainer.layout = BoxLayout(gamesContainer, BoxLayout.Y_AXIS)
-        gamesContainer.border = EmptyBorder(10, 5, 5, 5)
-
-        val scrollPane = JScrollPane(gamesContainer)
-        scrollPane.border = BorderFactory.createTitledBorder("")
-        scrollPane.verticalScrollBar.unitIncrement = 16
-        scrollPane.verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_ALWAYS
-        mainPanel.add(scrollPane, BorderLayout.CENTER)
+        tabbedPane.border = BorderFactory.createTitledBorder("")
+        mainPanel.add(tabbedPane, BorderLayout.CENTER)
 
         val fullBottomPanel = JPanel(BorderLayout())
         val buttonRowPanel = JPanel(BorderLayout())
@@ -2525,6 +2527,20 @@ class GameLauncher : JFrame("Styx") {
     private fun createMenuBar() {
         val menuBar = JMenuBar()
         val fileMenu = JMenu("File")
+
+        val newCategoryItem = JMenuItem("New Category").apply {
+            addActionListener { createNewCategory() }
+            accelerator = KeyStroke.getKeyStroke("control N")
+        }
+        fileMenu.add(newCategoryItem)
+
+        val deleteCategoryItem = JMenuItem("Delete Category").apply {
+            addActionListener { deleteCurrentCategory() }
+            accelerator = KeyStroke.getKeyStroke("control shift D")
+        }
+        fileMenu.add(deleteCategoryItem)
+        fileMenu.addSeparator()
+
         val quitItem = JMenuItem("Quit").apply {
             addActionListener { handleApplicationClose() }
             accelerator = KeyStroke.getKeyStroke("control Q")
@@ -2564,11 +2580,12 @@ class GameLauncher : JFrame("Styx") {
             <hr />
             <p>v0.0.2</p>
             <hr />
+            <br />
             <p>A game launcher for Linux</p>
             <br>
             <p>By Navid M</p>
             <br />
-            <a href="https://github.com/navid-m/styx">GitHub</a>
+            <a href="https://github.com/navid-m/styx">github.com/navid-m/styx</a>
             </ul>
             </html>
         """.trimIndent()
@@ -2615,6 +2632,101 @@ class GameLauncher : JFrame("Styx") {
         }
     }
 
+    private fun loadCategories() {
+        if (categoriesFile.exists()) {
+            try {
+                val json = categoriesFile.readText()
+                val type = object : TypeToken<List<String>>() {}.type
+                categories.clear()
+                val loadedCategories: List<String> = gson.fromJson(json, type)
+                categories.addAll(loadedCategories)
+            } catch (e: Exception) {
+                System.err.println("Failed to load categories: ${e.message}")
+            }
+        }
+
+        if (!categories.contains("All")) {
+            categories.add(0, "All")
+        }
+    }
+
+    private fun saveCategories() {
+        try {
+            categoriesFile.parent.createDirectories()
+            val json = gson.toJson(categories)
+            categoriesFile.writeText(json)
+        } catch (e: Exception) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Failed to save categories: ${e.message}",
+                "Error",
+                JOptionPane.WARNING_MESSAGE
+            )
+        }
+    }
+
+    private fun createNewCategory() {
+        val categoryName = JOptionPane.showInputDialog(
+            this,
+            "Enter category name:",
+            "New Category",
+            JOptionPane.PLAIN_MESSAGE
+        )
+
+        if (!categoryName.isNullOrBlank()) {
+            val trimmedName = categoryName.trim()
+            if (categories.contains(trimmedName)) {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Category '$trimmedName' already exists.",
+                    "Duplicate Category",
+                    JOptionPane.WARNING_MESSAGE
+                )
+                return
+            }
+
+            categories.add(trimmedName)
+            saveCategories()
+            refreshGamesList()
+            statusLabel.text = "Created category: $trimmedName"
+        }
+    }
+
+    private fun deleteCurrentCategory() {
+        val selectedIndex = tabbedPane.selectedIndex
+        if (selectedIndex < 0) return
+
+        val categoryName = tabbedPane.getTitleAt(selectedIndex)
+
+        if (categoryName == "All") {
+            JOptionPane.showMessageDialog(
+                this,
+                "Cannot delete the 'All' category.",
+                "Cannot Delete",
+                JOptionPane.WARNING_MESSAGE
+            )
+            return
+        }
+
+        val result = JOptionPane.showConfirmDialog(
+            this,
+            "Delete category '$categoryName'?\n\nGames in this category will be moved to 'All'.",
+            "Confirm Delete",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        )
+
+        if (result == JOptionPane.YES_OPTION) {
+            games.filter { it.category == categoryName }.forEach { it.category = "All" }
+
+            categories.remove(categoryName)
+            saveCategories()
+            saveGames()
+            refreshGamesList()
+            statusLabel.text = "Deleted category: $categoryName"
+        }
+    }
+
     private fun saveGames() {
         try {
             configFile.parent.createDirectories()
@@ -2635,17 +2747,34 @@ class GameLauncher : JFrame("Styx") {
     }
 
     private fun refreshGamesList(filter: String?) {
-        gamesContainer.removeAll()
+        tabbedPane.removeAll()
+        categoryPanels.clear()
 
-        val filteredGames = if (filter.isNullOrBlank()) {
-            games
-        } else {
-            games.filter { it.name.contains(filter, ignoreCase = true) }
-        }
+        val searchFilter = filter?.trim()?.lowercase()
 
-        filteredGames.forEach { game ->
-            val gameWidget =
-                GameItemWidgetWithImage(
+        categories.forEach { category ->
+            val panel = JPanel()
+            panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
+            panel.border = EmptyBorder(10, 5, 5, 5)
+
+            setupDragAndDrop(panel, category)
+
+            val gamesInCategory = if (category == "All") {
+                if (searchFilter.isNullOrBlank()) {
+                    games
+                } else {
+                    games.filter { it.name.lowercase().contains(searchFilter) }
+                }
+            } else {
+                if (searchFilter.isNullOrBlank()) {
+                    games.filter { it.category == category }
+                } else {
+                    games.filter { it.category == category && it.name.lowercase().contains(searchFilter) }
+                }
+            }
+
+            gamesInCategory.forEach { game ->
+                val gameWidget = GameItemWidgetWithImage(
                     game,
                     ::launchGame,
                     ::changeGamePrefix,
@@ -2657,14 +2786,168 @@ class GameLauncher : JFrame("Styx") {
                     ::renameGame,
                     ::openGameConfig
                 )
-            gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 70)
-            gamesContainer.add(gameWidget)
-            gamesContainer.add(Box.createVerticalStrut(5))
+                gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 70)
+                makeDraggable(gameWidget, game)
+                panel.add(gameWidget)
+                panel.add(Box.createVerticalStrut(5))
+            }
+
+            panel.add(Box.createVerticalGlue())
+
+            val scrollPane = JScrollPane(panel)
+            scrollPane.verticalScrollBar.unitIncrement = 16
+            scrollPane.verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED
+            scrollPane.horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
+
+            tabbedPane.addTab(category, scrollPane)
+            categoryPanels[category] = panel
         }
 
-        gamesContainer.add(Box.createVerticalGlue())
-        gamesContainer.revalidate()
-        gamesContainer.repaint()
+        tabbedPane.addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) {
+                if (e.isPopupTrigger) {
+                    showTabContextMenu(e)
+                }
+            }
+
+            override fun mouseReleased(e: java.awt.event.MouseEvent) {
+                if (e.isPopupTrigger) {
+                    showTabContextMenu(e)
+                }
+            }
+        })
+
+        setupTabDropTargets()
+
+        tabbedPane.revalidate()
+        tabbedPane.repaint()
+    }
+
+    private fun showTabContextMenu(e: java.awt.event.MouseEvent) {
+        val tabIndex = tabbedPane.indexAtLocation(e.x, e.y)
+        if (tabIndex >= 0) {
+            val categoryName = tabbedPane.getTitleAt(tabIndex)
+            val popup = JPopupMenu()
+
+            if (categoryName != "All") {
+                val deleteItem = JMenuItem("Delete Category").apply {
+                    addActionListener {
+                        tabbedPane.selectedIndex = tabIndex
+                        deleteCurrentCategory()
+                    }
+                }
+                popup.add(deleteItem)
+            }
+
+            if (popup.componentCount > 0) {
+                popup.show(e.component, e.x, e.y)
+            }
+        }
+    }
+
+    private fun setupTabDropTargets() {
+        tabbedPane.dropTarget = DropTarget(tabbedPane, object : DropTargetAdapter() {
+            private var draggedGameName: String? = null
+
+            override fun dragEnter(dtde: DropTargetDragEvent) {
+                dtde.acceptDrag(DnDConstants.ACTION_MOVE)
+            }
+
+            override fun dragOver(dtde: DropTargetDragEvent) {
+                val location = dtde.location
+                val tabIndex = tabbedPane.indexAtLocation(location.x, location.y)
+
+                if (tabIndex >= 0 && tabIndex != tabbedPane.selectedIndex) {
+                    tabbedPane.selectedIndex = tabIndex
+                }
+
+                dtde.acceptDrag(DnDConstants.ACTION_MOVE)
+            }
+
+            override fun drop(dtde: DropTargetDropEvent) {
+                try {
+                    val location = dtde.location
+                    val tabIndex = tabbedPane.indexAtLocation(location.x, location.y)
+
+                    if (tabIndex >= 0) {
+                        val categoryName = tabbedPane.getTitleAt(tabIndex)
+
+                        dtde.acceptDrop(DnDConstants.ACTION_MOVE)
+                        val transferable = dtde.transferable
+                        val gameName = transferable.getTransferData(DataFlavor.stringFlavor) as String
+
+                        val game = games.find { it.name == gameName }
+                        if (game != null && categoryName != "All" && game.category != categoryName) {
+                            game.category = categoryName
+                            saveGames()
+                            refreshGamesList()
+                            tabbedPane.selectedIndex = tabIndex
+                            statusLabel.text = "Moved ${game.name} to $categoryName"
+                            dtde.dropComplete(true)
+                            return
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                dtde.dropComplete(false)
+            }
+        })
+    }
+
+    private fun setupDragAndDrop(panel: JPanel, category: String) {
+        panel.dropTarget = DropTarget(panel, object : DropTargetAdapter() {
+            override fun drop(dtde: DropTargetDropEvent) {
+                try {
+                    dtde.acceptDrop(DnDConstants.ACTION_MOVE)
+                    val transferable = dtde.transferable
+                    val gameName = transferable.getTransferData(DataFlavor.stringFlavor) as String
+
+                    val game = games.find { it.name == gameName }
+                    if (game != null && category != "All" && game.category != category) {
+                        game.category = category
+                        saveGames()
+                        refreshGamesList()
+                        statusLabel.text = "Moved ${game.name} to $category"
+                    }
+
+                    dtde.dropComplete(true)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    dtde.dropComplete(false)
+                }
+            }
+        })
+    }
+
+    private fun makeDraggable(widget: JPanel, game: Game) {
+        val dragSource = DragSource.getDefaultDragSource()
+        dragSource.createDefaultDragGestureRecognizer(
+            widget,
+            DnDConstants.ACTION_MOVE,
+            object : DragGestureListener {
+                override fun dragGestureRecognized(dge: DragGestureEvent) {
+                    val transferable = object : Transferable {
+                        override fun getTransferDataFlavors(): Array<DataFlavor> {
+                            return arrayOf(DataFlavor.stringFlavor)
+                        }
+
+                        override fun isDataFlavorSupported(flavor: DataFlavor): Boolean {
+                            return flavor == DataFlavor.stringFlavor
+                        }
+
+                        override fun getTransferData(flavor: DataFlavor): Any {
+                            if (flavor == DataFlavor.stringFlavor) {
+                                return game.name
+                            }
+                            throw UnsupportedFlavorException(flavor)
+                        }
+                    }
+
+                    dge.startDrag(DragSource.DefaultMoveDrop, transferable)
+                }
+            }
+        )
     }
 
     private fun renameGame(game: Game) {

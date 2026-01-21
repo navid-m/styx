@@ -13,7 +13,8 @@ data class Game(
     var timesOpened: Int = 0,
     var timesCrashed: Int = 0,
     var type: GameType? = null,
-    var verboseLogging: Boolean = false
+    var verboseLogging: Boolean = false,
+    var category: String = "All"
 ) {
     /**
      * Helper to get game type.
