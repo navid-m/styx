@@ -1,5 +1,11 @@
 package com.styx.utils
 
+/**
+ * Format the time played given the minutes as a long.
+ *
+ * @param minutes The minutes
+ * @return The formatted time.
+ */
 fun formatTimePlayed(minutes: Long): String {
     return if (minutes == 0L) {
         "Not yet played"
