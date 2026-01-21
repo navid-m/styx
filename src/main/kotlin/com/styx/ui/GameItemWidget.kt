@@ -663,7 +663,7 @@ class GameItemWidget(
 
     private fun copyImageToConfigDir(sourceFile: File): String? {
         try {
-            val configDir = Paths.get(System.getProperty("user.home"), ".config", "Styx").toFile()
+            val configDir = Paths.get(System.getProperty("user.home"), ".config", "styx").toFile()
             configDir.mkdirs()
 
             val artDir = File(configDir, "art")
