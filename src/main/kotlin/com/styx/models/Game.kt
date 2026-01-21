@@ -1,5 +1,8 @@
 package com.styx.models
 
+/**
+ * Contains all data regarding the game itself.
+ */
 data class Game(
     var name: String,
     val executable: String,

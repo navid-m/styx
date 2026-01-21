@@ -7,6 +7,7 @@ import com.styx.utils.formatTimePlayed
 import com.styx.models.Game
 import com.styx.models.GameType
 import com.styx.models.PrefixInfo
+import com.styx.models.GlobalSettings
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension
@@ -63,6 +64,7 @@ class GameLauncher : JFrame("Styx") {
     private var availablePrefixes = listOf<PrefixInfo>()
     private val configFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "games.json")
     private val categoriesFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "categories.json")
+    private val settingsFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "settings.json")
     private val gameProcesses = mutableMapOf<String, Process>()
     private val outputWindows = mutableMapOf<String, GameOutputWindow>()
     private val tabbedPane = JTabbedPane()
@@ -71,6 +73,7 @@ class GameLauncher : JFrame("Styx") {
     private val logReaderThreads = mutableListOf<Thread>()
     private val gameStartTimes = mutableMapOf<String, Long>()
     private val searchField = JTextField()
+    var globalSettings = GlobalSettings()
 
     @Volatile
     private var isShuttingDown = false
@@ -80,6 +83,7 @@ class GameLauncher : JFrame("Styx") {
     init {
         initUI()
         loadCategories()
+        loadSettings()
         loadGames()
         scanPrefixes()
 
@@ -223,6 +227,13 @@ class GameLauncher : JFrame("Styx") {
         fileMenu.add(quitItem)
 
         val toolsMenu = JMenu("Tools")
+        val settingsItem = JMenuItem("Settings").apply {
+            addActionListener { openSettings() }
+            accelerator = KeyStroke.getKeyStroke("control COMMA")
+        }
+        toolsMenu.add(settingsItem)
+        toolsMenu.addSeparator()
+
         val wineserverMgmtItem = JMenuItem("Wineserver Management").apply {
             addActionListener { openWineserverManagement() }
             accelerator = KeyStroke.getKeyStroke("control K")
@@ -324,6 +335,40 @@ class GameLauncher : JFrame("Styx") {
         }
     }
 
+    private fun loadSettings() {
+        if (settingsFile.exists()) {
+            try {
+                val json = settingsFile.readText()
+                globalSettings = gson.fromJson(json, GlobalSettings::class.java) ?: GlobalSettings()
+            } catch (e: Exception) {
+                System.err.println("Failed to load settings: ${e.message}")
+                globalSettings = GlobalSettings()
+            }
+        } else {
+            globalSettings = GlobalSettings()
+        }
+    }
+
+    fun saveSettings() {
+        try {
+            settingsFile.parent.createDirectories()
+            val json = gson.toJson(globalSettings)
+            settingsFile.writeText(json)
+        } catch (e: Exception) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Failed to save settings: ${e.message}",
+                "Error",
+                JOptionPane.WARNING_MESSAGE
+            )
+        }
+    }
+
+    private fun openSettings() {
+        val dialog = SettingsDialog(this)
+        dialog.isVisible = true
+    }
+
     private fun saveCategories() {
         try {
             categoriesFile.parent.createDirectories()
@@ -416,7 +461,7 @@ class GameLauncher : JFrame("Styx") {
         }
     }
 
-    private fun refreshGamesList() {
+    fun refreshGamesList() {
         refreshGamesList(null)
     }
 
@@ -450,6 +495,7 @@ class GameLauncher : JFrame("Styx") {
             gamesInCategory.forEach { game ->
                 val gameWidget = GameItemWidgetWithImage(
                     game,
+                    this,
                     ::launchGame,
                     ::changeGamePrefix,
                     ::openProtonManager,
@@ -1202,6 +1248,10 @@ class GameLauncher : JFrame("Styx") {
             if (useProton) {
                 env["STEAM_COMPAT_DATA_PATH"] = prefixPath
                 env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = game.protonPath ?: ""
+            }
+
+            globalSettings.globalFlags.forEach { (key, value) ->
+                env[key] = value
             }
 
             game.launchOptions.forEach { (key, value) ->

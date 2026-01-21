@@ -854,7 +854,7 @@ class LaunchOptionsDialog(
     }
 }
 
-class AddNativeGameDialog(parent: JFrame) : JDialog(parent, "Add Native Linux Game", true) {
+class AddNativeGameDialog(private val launcher: GameLauncher) : JDialog(launcher, "Add Native Linux Game", true) {
 
     private val nameInput = JTextField(30)
     private val exeInput = JTextField(30)
@@ -952,6 +952,7 @@ class AddNativeGameDialog(parent: JFrame) : JDialog(parent, "Add Native Linux Ga
 
 class GameItemWidgetWithImage(
     private val game: Game,
+    private val launcher: GameLauncher,
     private val onLaunch: (Game) -> Unit,
     private val onChangePrefix: (Game) -> Unit,
     private val onProtonManager: (Game) -> Unit,
@@ -991,18 +992,18 @@ class GameItemWidgetWithImage(
 
         val nameLabel = JLabel(game.name)
         nameLabel.font = nameLabel.font.deriveFont(Font.PLAIN, 14f)
-        nameLabel.foreground = Color.WHITE
+        nameLabel.foreground = launcher.globalSettings.theme.getGameTitleColorObject()
         infoPanel.add(nameLabel)
 
         val typeOrPrefixLabel: JLabel = when (game.getGameType()) {
             GameType.NATIVE_LINUX -> JLabel("Type: Native Linux").apply {
                 font = font.deriveFont(11f)
-                foreground = Color(100, 200, 255)
+                foreground = launcher.globalSettings.theme.getMetadataLabelColorObject()
             }
 
             GameType.STEAM -> JLabel("Type: Steam").apply {
                 font = font.deriveFont(11f)
-                foreground = Color(102, 153, 255)
+                foreground = launcher.globalSettings.theme.getMetadataLabelColorObject()
             }
 
             GameType.WINDOWS -> {
@@ -1022,7 +1023,7 @@ class GameItemWidgetWithImage(
             }
         } else {
             JLabel(formatTimePlayed(game.timePlayed)).apply {
-                foreground = Color(3, 252, 252)
+                foreground = launcher.globalSettings.theme.getTimePlayedColorObject()
                 font = font.deriveFont(11f)
             }
         }
@@ -1368,7 +1369,7 @@ class GameItemWidgetWithImage(
         val titleLabel = JLabel("Statistics for ${game.name}")
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
         titleLabel.border = EmptyBorder(0, 0, 20, 0)
-        titleLabel.foreground = Color.WHITE
+        titleLabel.foreground = launcher.globalSettings.theme.getGameTitleColorObject()
         mainPanel.add(titleLabel, BorderLayout.NORTH)
 
         val tableData = arrayOf(
