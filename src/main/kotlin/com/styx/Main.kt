@@ -2436,11 +2436,6 @@ class GameLauncher : JFrame("Styx") {
         mainPanel.border = EmptyBorder(10, 10, 10, 10)
 
         val topPanel = JPanel(BorderLayout(10, 5))
-
-        val titleLabel = JLabel("Library")
-        titleLabel.font = titleLabel.font.deriveFont(Font.PLAIN, 18f)
-        topPanel.add(titleLabel, BorderLayout.NORTH)
-
         val searchPanel = JPanel(BorderLayout(5, 0))
         searchField.preferredSize = Dimension(300, 30)
         searchField.toolTipText = "Search library..."
@@ -2526,6 +2521,7 @@ class GameLauncher : JFrame("Styx") {
 
     private fun createMenuBar() {
         val menuBar = JMenuBar()
+        menuBar.background = Color(34, 35, 36)
         val fileMenu = JMenu("File")
 
         val newCategoryItem = JMenuItem("New Category").apply {
