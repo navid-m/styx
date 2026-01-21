@@ -146,6 +146,7 @@ class GameLauncher : JFrame("Styx") {
 
         val fullBottomPanel = JPanel(BorderLayout())
         val buttonRowPanel = JPanel(BorderLayout())
+        buttonRowPanel.border = EmptyBorder(0, 0, 10, 0)
         val leftButtonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 8, 0))
         val removeBtn = JButton("Remove Game").apply {
             preferredSize = Dimension(120, 32)
@@ -191,7 +192,10 @@ class GameLauncher : JFrame("Styx") {
         fullBottomPanel.add(buttonRowPanel, BorderLayout.NORTH)
 
         val statusPanel = JPanel(BorderLayout())
-        statusPanel.border = EmptyBorder(5, 10, 5, 10)
+        statusPanel.border = BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(1, 0, 0, 0, Color(60, 63, 65)),
+            EmptyBorder(8, 10, 5, 10)
+        )
         statusPanel.add(statusLabel, BorderLayout.WEST)
         fullBottomPanel.add(statusPanel, BorderLayout.SOUTH)
         mainPanel.add(fullBottomPanel, BorderLayout.SOUTH)
