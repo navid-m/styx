@@ -283,8 +283,9 @@ class GameOutputWindow(
 
         updateOutputDisplay()
         outputText.isEditable = false
-        outputText.font = Font("Monospaced", Font.PLAIN, 9)
-        outputText.lineWrap = false
+        outputText.lineWrap = true
+        outputText.wrapStyleWord = true
+        outputText.font = Font("Monospaced", Font.PLAIN, 11)
         val scrollPane = JScrollPane(outputText)
         contentPanel.add(scrollPane, BorderLayout.CENTER)
 
