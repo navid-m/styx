@@ -10,6 +10,7 @@ import com.styx.models.PrefixInfo
 import com.styx.models.GlobalSettings
 import java.awt.BorderLayout
 import java.awt.Color
+import java.awt.Desktop
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.Font
@@ -206,6 +207,17 @@ class GameLauncher : JFrame("Styx") {
         menuBar.background = Color(34, 35, 36)
         val fileMenu = JMenu("File")
 
+        val openConfigDirItem = JMenuItem("Open Styx Configuration Directory").apply {
+            addActionListener { openStyxConfigDirectory() }
+        }
+        fileMenu.add(openConfigDirItem)
+
+        val openWineprefixDirItem = JMenuItem("Open Global Wineprefix Directory").apply {
+            addActionListener { openGlobalWineprefixDirectory() }
+        }
+        fileMenu.add(openWineprefixDirItem)
+        fileMenu.addSeparator()
+
         val newCategoryItem = JMenuItem("New Category").apply {
             addActionListener { createNewCategory() }
             accelerator = KeyStroke.getKeyStroke("control N")
@@ -251,6 +263,48 @@ class GameLauncher : JFrame("Styx") {
         menuBar.add(helpMenu)
 
         jMenuBar = menuBar
+    }
+
+    private fun openStyxConfigDirectory() {
+        try {
+            val configDir = Paths.get(System.getProperty("user.home"), ".config", "styx").toFile()
+            if (!configDir.exists()) {
+                configDir.mkdirs()
+            }
+            Desktop.getDesktop().open(configDir)
+        } catch (e: Exception) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Failed to open configuration directory: ${e.message}",
+                "Error",
+                JOptionPane.ERROR_MESSAGE
+            )
+        }
+    }
+
+    private fun openGlobalWineprefixDirectory() {
+        try {
+            val wineprefixDir = Paths.get(System.getProperty("user.home"), ".wine").toFile()
+            if (!wineprefixDir.exists()) {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Global wineprefix directory not found at: ${wineprefixDir.absolutePath}\n\n" +
+                            "The default location is ~/.wine\n" +
+                            "It will be created when you first run a Windows application with Wine.",
+                    "Directory Not Found",
+                    JOptionPane.INFORMATION_MESSAGE
+                )
+                return
+            }
+            Desktop.getDesktop().open(wineprefixDir)
+        } catch (e: Exception) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Failed to open wineprefix directory: ${e.message}",
+                "Error",
+                JOptionPane.ERROR_MESSAGE
+            )
+        }
     }
 
     private fun openWineserverManagement() {
