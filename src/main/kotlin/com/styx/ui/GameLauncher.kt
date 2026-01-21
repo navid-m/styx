@@ -171,7 +171,6 @@ class GameLauncher : JFrame("Styx") {
         }
 
         rightButtonPanel.add(addBtn)
-
         buttonRowPanel.add(leftButtonPanel, BorderLayout.WEST)
         buttonRowPanel.add(rightButtonPanel, BorderLayout.EAST)
         fullBottomPanel.add(buttonRowPanel, BorderLayout.NORTH)
