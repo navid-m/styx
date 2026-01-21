@@ -11,6 +11,7 @@ data class Game(
     var protonPath: String? = null,
     var protonBin: String? = null,
     var launchOptions: MutableMap<String, String> = mutableMapOf(),
+    var singletonFlags: MutableList<String>? = mutableListOf(),
     var imagePath: String? = null,
     var timePlayed: Long = 0,
     var timesOpened: Int = 0,

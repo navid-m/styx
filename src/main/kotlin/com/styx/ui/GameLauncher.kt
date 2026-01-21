@@ -364,6 +364,13 @@ class GameLauncher : JFrame("Styx") {
                 val type = object : TypeToken<List<Game>>() {}.type
                 games.clear()
                 val loadedGames: List<Game> = gson.fromJson(json, type)
+                
+                loadedGames.forEach { game ->
+                    if (game.singletonFlags == null) {
+                        game.singletonFlags = mutableListOf()
+                    }
+                }
+                
                 games.addAll(loadedGames)
                 refreshGamesList()
             } catch (e: Exception) {
@@ -1057,6 +1064,12 @@ class GameLauncher : JFrame("Styx") {
 
             gameInList.launchOptions.clear()
             gameInList.launchOptions.putAll(dialog.launchOptions)
+            
+            if (gameInList.singletonFlags == null) {
+                gameInList.singletonFlags = mutableListOf()
+            }
+            gameInList.singletonFlags!!.clear()
+            gameInList.singletonFlags!!.addAll(dialog.singletonFlags)
 
             saveGames()
             statusLabel.text = "Updated launch options for ${game.name}"
@@ -1369,9 +1382,8 @@ class GameLauncher : JFrame("Styx") {
                 env[key] = value
             }
 
-            // Set Wine debug level based on game configuration
             val debugLevel = if (game.verboseLogging) {
-                "+all"  // Backwards compatibility for old saves
+                "+all"
             } else {
                 game.wineLogLevel
             }
@@ -1422,16 +1434,26 @@ class GameLauncher : JFrame("Styx") {
 
             if (useProton) {
                 val protonBin = game.protonBin!!
-                processBuilder.command(protonBin, "run", File(exePath).absolutePath)
+                val commandList = mutableListOf(protonBin, "run", File(exePath).absolutePath)
+                game.singletonFlags?.let { commandList.addAll(it) }
+                processBuilder.command(commandList)
 
                 outputWindow.appendOutput("=== Starting Proton Process ===", "#0066cc")
-                outputWindow.appendOutput("Command: $protonBin run ${File(exePath).absolutePath}")
+                outputWindow.appendOutput("Command: ${commandList.joinToString(" ")}")
+                if (!game.singletonFlags.isNullOrEmpty()) {
+                    outputWindow.appendOutput("Standalone flags: ${(game.singletonFlags as Iterable<Any?>).joinToString(" ")}", "#00aa00")
+                }
                 outputWindow.appendOutput("")
             } else {
-                processBuilder.command("wine", File(exePath).absolutePath)
+                val commandList = mutableListOf("wine", File(exePath).absolutePath)
+                game.singletonFlags?.let { commandList.addAll(it) }
+                processBuilder.command(commandList)
 
                 outputWindow.appendOutput("=== Starting Wine Process ===", "#0066cc")
-                outputWindow.appendOutput("Command: wine ${File(exePath).absolutePath}")
+                outputWindow.appendOutput("Command: ${commandList.joinToString(" ")}")
+                if (!game.singletonFlags.isNullOrEmpty()) {
+                    outputWindow.appendOutput("Standalone flags: ${(game.singletonFlags as Iterable<Any?>).joinToString(" ")}", "#00aa00")
+                }
                 outputWindow.appendOutput("")
             }
 

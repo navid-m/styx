@@ -24,7 +24,10 @@ class LaunchOptionsDialog(
 
     private val tableModel = DefaultTableModel(arrayOf("Variable", "Value"), 0)
     private val table = JTable(tableModel)
+    private val flagsTableModel = DefaultTableModel(arrayOf("Flag"), 0)
+    private val flagsTable = JTable(flagsTableModel)
     val launchOptions = mutableMapOf<String, String>()
+    val singletonFlags = mutableListOf<String>()
 
     init {
         initUI()
@@ -32,53 +35,89 @@ class LaunchOptionsDialog(
     }
 
     private fun initUI() {
-        minimumSize = Dimension(600, 400)
+        minimumSize = Dimension(650, 550)
 
         val mainPanel = JPanel(BorderLayout(10, 10))
         mainPanel.border = EmptyBorder(10, 10, 10, 10)
 
-        val titleLabel = JLabel("Environment Variables / Launch Options")
-        titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 11f)
-        titleLabel.border = EmptyBorder(0, 0, 10, 0)
+        val titleLabel = JLabel("Launch Options")
+        titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 14f)
+        titleLabel.border = EmptyBorder(0, 0, 15, 0)
         mainPanel.add(titleLabel, BorderLayout.NORTH)
 
+        val centerPanel = JPanel()
+        centerPanel.layout = javax.swing.BoxLayout(centerPanel, javax.swing.BoxLayout.Y_AXIS)
+
+        val envPanel = JPanel(BorderLayout(5, 5))
+        envPanel.border = javax.swing.BorderFactory.createTitledBorder("Environment Variables (KEY=VALUE)")
+        
         val infoLabel = JLabel(
-            "<html>Add environment variables that will be set when launching this game.<br>" +
-                    "Examples: DXVK_CONFIG_FILE, MANGOHUD, PROTON_USE_WINED3D, etc.</html>"
+            "<html><small>Add environment variables that will be set when launching this game.<br>" +
+                    "Examples: DXVK_CONFIG_FILE, MANGOHUD, PROTON_USE_WINED3D, etc.</small></html>"
         )
         infoLabel.foreground = Color(0x66, 0x66, 0x66)
-        infoLabel.border = EmptyBorder(0, 0, 10, 0)
-        val topPanel = JPanel(BorderLayout())
-        topPanel.add(infoLabel, BorderLayout.NORTH)
-        mainPanel.add(topPanel, BorderLayout.NORTH)
+        infoLabel.border = EmptyBorder(5, 5, 10, 5)
+        envPanel.add(infoLabel, BorderLayout.NORTH)
 
         table.fillsViewportHeight = true
+        table.preferredScrollableViewportSize = Dimension(600, 150)
         val scrollPane = JScrollPane(table)
-        mainPanel.add(scrollPane, BorderLayout.CENTER)
+        envPanel.add(scrollPane, BorderLayout.CENTER)
 
-        val buttonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 8, 0))
-
-        val addBtn = JButton("Add Variable").apply {
-            preferredSize = Dimension(120, 32)
+        val envButtonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 8, 5))
+        val addBtn = JButton("Add").apply {
+            preferredSize = Dimension(100, 28)
             addActionListener { addRow() }
         }
-
-        val removeBtn = JButton("Remove Selected").apply {
-            preferredSize = Dimension(140, 32)
+        val removeBtn = JButton("Remove").apply {
+            preferredSize = Dimension(100, 28)
             addActionListener { removeSelectedRow() }
         }
-
-        val presetBtn = JButton("Common Presets...").apply {
-            preferredSize = Dimension(150, 32)
+        val presetBtn = JButton("Presets...").apply {
+            preferredSize = Dimension(100, 28)
             addActionListener { showPresets() }
         }
+        envButtonPanel.add(addBtn)
+        envButtonPanel.add(removeBtn)
+        envButtonPanel.add(presetBtn)
+        envPanel.add(envButtonPanel, BorderLayout.SOUTH)
 
-        buttonPanel.add(addBtn)
-        buttonPanel.add(removeBtn)
-        buttonPanel.add(presetBtn)
+        centerPanel.add(envPanel)
+        centerPanel.add(javax.swing.Box.createVerticalStrut(15))
 
-        val bottomPanel = JPanel(BorderLayout())
-        bottomPanel.add(buttonPanel, BorderLayout.WEST)
+        val flagsPanel = JPanel(BorderLayout(5, 5))
+        flagsPanel.border = javax.swing.BorderFactory.createTitledBorder("Standalone Flags")
+        
+        val flagsInfoLabel = JLabel(
+            "<html><small>Add standalone flags/arguments without values (e.g., -d3d9, --no-sandbox, etc.)</small></html>"
+        )
+        flagsInfoLabel.foreground = Color(0x66, 0x66, 0x66)
+        flagsInfoLabel.border = EmptyBorder(5, 5, 10, 5)
+        flagsPanel.add(flagsInfoLabel, BorderLayout.NORTH)
+
+        flagsTable.fillsViewportHeight = true
+        flagsTable.preferredScrollableViewportSize = Dimension(600, 120)
+        val flagsScrollPane = JScrollPane(flagsTable)
+        flagsPanel.add(flagsScrollPane, BorderLayout.CENTER)
+
+        val flagsButtonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 8, 5))
+        val addFlagBtn = JButton("Add").apply {
+            preferredSize = Dimension(100, 28)
+            addActionListener { addFlagRow() }
+        }
+        val removeFlagBtn = JButton("Remove").apply {
+            preferredSize = Dimension(100, 28)
+            addActionListener { removeSelectedFlagRow() }
+        }
+        flagsButtonPanel.add(addFlagBtn)
+        flagsButtonPanel.add(removeFlagBtn)
+        flagsPanel.add(flagsButtonPanel, BorderLayout.SOUTH)
+
+        centerPanel.add(flagsPanel)
+
+        mainPanel.add(centerPanel, BorderLayout.CENTER)
+        
+        val bottomPanel = JPanel(BorderLayout(10, 0))
 
         val saveButtonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
 
@@ -109,6 +148,12 @@ class LaunchOptionsDialog(
             tableModel.addRow(arrayOf(key, value))
             launchOptions[key] = value
         }
+        
+        singletonFlags.clear()
+        game.singletonFlags?.forEach { flag ->
+            flagsTableModel.addRow(arrayOf(flag))
+            singletonFlags.add(flag)
+        }
     }
 
     private fun addRow() {
@@ -122,6 +167,27 @@ class LaunchOptionsDialog(
         val selectedRow = table.selectedRow
         if (selectedRow >= 0) {
             tableModel.removeRow(selectedRow)
+        } else {
+            JOptionPane.showMessageDialog(
+                this,
+                "You need to select a row to remove.",
+                "No Selection",
+                JOptionPane.INFORMATION_MESSAGE
+            )
+        }
+    }
+    
+    private fun addFlagRow() {
+        flagsTableModel.addRow(arrayOf(""))
+        val lastRow = flagsTableModel.rowCount - 1
+        flagsTable.editCellAt(lastRow, 0)
+        flagsTable.requestFocus()
+    }
+    
+    private fun removeSelectedFlagRow() {
+        val selectedRow = flagsTable.selectedRow
+        if (selectedRow >= 0) {
+            flagsTableModel.removeRow(selectedRow)
         } else {
             JOptionPane.showMessageDialog(
                 this,
@@ -187,6 +253,15 @@ class LaunchOptionsDialog(
                 launchOptions[key] = value
             }
         }
+        
+        singletonFlags.clear()
+        for (i in 0 until flagsTableModel.rowCount) {
+            val flag = flagsTableModel.getValueAt(i, 0)?.toString()?.trim() ?: ""
+            if (flag.isNotEmpty()) {
+                singletonFlags.add(flag)
+            }
+        }
+        
         dispose()
     }
 }
