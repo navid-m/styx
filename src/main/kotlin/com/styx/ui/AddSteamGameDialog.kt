@@ -16,7 +16,6 @@ import javax.swing.JTextField
 import javax.swing.border.EmptyBorder
 
 class AddSteamGameDialog(parent: JFrame) : JDialog(parent, "Add Steam Game", true) {
-
     private val nameInput = JTextField(30)
     private val steamIdInput = JTextField(30)
     var gameData: Game? = null
