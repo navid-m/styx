@@ -235,11 +235,11 @@ class GameOutputWindow(
     parent: JFrame? = null,
     private val onAbort: ((String) -> Unit)? = null,
     private val prefixPath: String? = null,
-    private val useProton: Boolean = false
+    private val useProton: Boolean = false,
+    private val verboseLogging: Boolean = false
 ) : JFrame("Game Output - $gameName") {
     private val outputText = JTextArea()
-    private val verboseCheckbox = JCheckBox("Verbose Mode (show all Wine debug)", false)
-    private val hideDebugCheckbox = JCheckBox("Hide Wine debug output", false)
+    private val hideDebugCheckbox = JCheckBox("Hide Wine debug output (improves performance)", !verboseLogging)
     private val abortBtn = JButton("Abort Launch")
     private val maxDisplayLines = 5000
     private val fullLogBuffer = mutableListOf<String>()
@@ -271,16 +271,12 @@ class GameOutputWindow(
         val titleLabel = JLabel("Output for: $gameName")
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 12f)
 
-        contentPanel.add(titleLabel, BorderLayout.NORTH)
-
         val topPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 5))
-        topPanel.add(verboseCheckbox)
         topPanel.add(hideDebugCheckbox)
-        hideDebugCheckbox.addActionListener {
-            needsUIUpdate = true
-            updateUI()
-        }
+        hideDebugCheckbox.toolTipText = "When enabled, prevents output from being captured to improve game performance"
         contentPanel.add(topPanel, BorderLayout.NORTH)
+        
+        contentPanel.add(titleLabel, BorderLayout.NORTH)
         outputText.isEditable = false
         outputText.font = Font("Monospaced", Font.PLAIN, 9)
         outputText.lineWrap = false
@@ -350,14 +346,7 @@ class GameOutputWindow(
         synchronized(displayBuffer) {
             if (displayBuffer.isEmpty()) return
 
-            val linesToDisplay = if (hideDebugCheckbox.isSelected) {
-                displayBuffer.takeLast(maxDisplayLines).filter { line ->
-                    !isDebugLine(line)
-                }
-            } else {
-                displayBuffer.takeLast(maxDisplayLines)
-            }
-
+            val linesToDisplay = displayBuffer.takeLast(maxDisplayLines)
             val text = linesToDisplay.joinToString("\n")
 
             SwingUtilities.invokeLater {
@@ -371,18 +360,8 @@ class GameOutputWindow(
         }
     }
 
-    private fun isDebugLine(line: String): Boolean {
-        val lowerLine = line.lowercase()
-        return lowerLine.contains("fixme:") ||
-                lowerLine.contains("warn:") ||
-                lowerLine.contains("err:") ||
-                lowerLine.contains("trace:") ||
-                (lowerLine.contains("[warn]") && !lowerLine.contains("protonfixes")) ||
-                (lowerLine.contains("[err]") && !lowerLine.contains("version mismatch"))
-    }
-
     fun appendOutput(text: String, color: String? = null) {
-        if (isClosing) return
+        if (isClosing || hideDebugCheckbox.isSelected) return
 
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
         val logLine = "[$timestamp] $text"
@@ -505,7 +484,7 @@ class GameOutputWindow(
         }.start()
     }
 
-    fun isVerboseMode(): Boolean = verboseCheckbox.isSelected
+    fun isHidingOutput(): Boolean = hideDebugCheckbox.isSelected
 }
 
 class PrefixScanner : SwingWorker<List<PrefixInfo>, Void>() {
@@ -2990,7 +2969,8 @@ class GameLauncher : JFrame("Styx") {
         val outputWindow = GameOutputWindow(
             gameName = gameName,
             parent = this,
-            onAbort = { abortGameName -> abortGameLaunch(abortGameName) }
+            onAbort = { abortGameName -> abortGameLaunch(abortGameName) },
+            verboseLogging = game.verboseLogging
         )
         outputWindows[gameName] = outputWindow
         outputWindow.isVisible = true
@@ -3088,7 +3068,8 @@ class GameLauncher : JFrame("Styx") {
         val outputWindow = GameOutputWindow(
             gameName = gameName,
             parent = this,
-            onAbort = { abortGameName -> abortGameLaunch(abortGameName) }
+            onAbort = { abortGameName -> abortGameLaunch(abortGameName) },
+            verboseLogging = game.verboseLogging
         )
         outputWindows[gameName] = outputWindow
         outputWindow.isVisible = true
@@ -3184,7 +3165,8 @@ class GameLauncher : JFrame("Styx") {
             parent = this,
             onAbort = { abortGameName -> abortGameLaunch(abortGameName) },
             prefixPath = prefixPath,
-            useProton = game.protonBin != null
+            useProton = game.protonBin != null,
+            verboseLogging = game.verboseLogging
         )
         outputWindows[gameName] = outputWindow
         outputWindow.isVisible = true
