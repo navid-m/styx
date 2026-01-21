@@ -136,13 +136,29 @@ class LaunchOptionsDialog(
         val presets = mapOf(
             "Enable DXVK HUD" to ("DXVK_HUD" to "fps,devinfo"),
             "Enable MangoHUD" to ("MANGOHUD" to "1"),
+            "Enable MangoHUD Detailed" to ("MANGOHUD" to "1"),
+            "Set DXVK Log Level (Info)" to ("DXVK_LOG_LEVEL" to "info"),
+            "Set DXVK Log Level (Error)" to ("DXVK_LOG_LEVEL" to "error"),
+            "Enable Wine Debug Logs" to ("WINEDEBUG" to "+loaddll,+seh"),
             "Enable DXVK Async" to ("DXVK_ASYNC" to "1"),
-            "Force WineD3D" to ("PROTON_USE_WINED3D" to "1"),
             "Enable DXVK State Cache" to ("DXVK_STATE_CACHE" to "1"),
+            "Disable DXVK State Cache" to ("DXVK_STATE_CACHE" to "0"),
+            "Force WineD3D (OpenGL)" to ("PROTON_USE_WINED3D" to "1"),
             "Disable NVAPI" to ("DXVK_NVAPI_DISABLE" to "1"),
+            "Hide NVIDIA GPU" to ("DXVK_HIDE_NVIDIA_GPU" to "1"),
+            "Disable DXVK" to ("PROTON_NO_DXVK" to "1"),
             "Enable Esync" to ("WINEESYNC" to "1"),
+            "Disable Esync" to ("WINEESYNC" to "0"),
             "Enable Fsync" to ("WINEFSYNC" to "1"),
-            "Set DXVK Log Level (Info)" to ("DXVK_LOG_LEVEL" to "info")
+            "Disable Fsync" to ("WINEFSYNC" to "0"),
+            "Disable Vulkan" to ("PROTON_NO_VULKAN" to "1"),
+            "Force Vulkan ICD Loader" to ("VK_ICD_FILENAMES" to "/usr/share/vulkan/icd.d"),
+            "Disable Proton Runtime" to ("STEAM_RUNTIME" to "0"),
+            "Force Large Address Aware" to ("WINE_LARGE_ADDRESS_AWARE" to "1"),
+            "Disable Fullscreen Optimizations" to ("PROTON_NO_FSYNC" to "1"),
+            "Use Native D3D Compiler" to ("PROTON_USE_D9VK" to "1"),
+            "Disable Gamepad Support" to ("SDL_GAMECONTROLLER_IGNORE_DEVICES" to "1"),
+            "Force Raw Mouse Input" to ("PROTON_FORCE_MOUSE_INPUT" to "1")
         )
 
         val options = presets.keys.toTypedArray()
