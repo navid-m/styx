@@ -196,6 +196,7 @@ class GameLauncher : JFrame("Styx") {
             BorderFactory.createMatteBorder(1, 0, 0, 0, Color(60, 63, 65)),
             EmptyBorder(12, 10, 5, 10)
         )
+        statusLabel.foreground = Color(163, 168, 165)
         statusPanel.add(statusLabel, BorderLayout.WEST)
         fullBottomPanel.add(statusPanel, BorderLayout.SOUTH)
         mainPanel.add(fullBottomPanel, BorderLayout.SOUTH)
