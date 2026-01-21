@@ -8,12 +8,17 @@ import java.awt.event.MouseEvent
 import javax.swing.*
 import javax.swing.border.EmptyBorder
 import javax.swing.border.TitledBorder
+import javax.swing.table.DefaultTableModel
 
 class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settings", true) {
     private val gameTitleColorPanel = JPanel()
     private val timePlayedColorPanel = JPanel()
     private val metadataColorPanel = JPanel()
-    private val globalFlagsArea = JTextArea(5, 40)
+    private val flagsTableModel = object : DefaultTableModel(arrayOf("Key", "Value"), 0) {
+        override fun isCellEditable(row: Int, column: Int) = true
+    }
+    private val flagsTable = JTable(flagsTableModel)
+    
     private var currentSettings = GlobalSettings()
 
     init {
@@ -28,8 +33,8 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
     }
 
     private fun initUI() {
-        minimumSize = Dimension(600, 500)
-        preferredSize = Dimension(600, 500)
+        minimumSize = Dimension(600, 550)
+        preferredSize = Dimension(600, 550)
         
         val mainPanel = JPanel(BorderLayout(10, 10))
         mainPanel.border = EmptyBorder(15, 15, 15, 15)
@@ -53,7 +58,7 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
         val panel = JPanel()
         panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
         panel.border = TitledBorder("Theme Colors")
-        panel.alignmentX = LEFT_ALIGNMENT
+        panel.alignmentX = Component.LEFT_ALIGNMENT
         
         panel.add(createColorRow("Game Title Color:", gameTitleColorPanel, currentSettings.theme::gameTitleColor))
         panel.add(Box.createVerticalStrut(10))
@@ -66,7 +71,7 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
 
     private fun createColorRow(label: String, colorPanel: JPanel, colorProperty: kotlin.reflect.KMutableProperty0<String>): JPanel {
         val row = JPanel(FlowLayout(FlowLayout.LEFT, 10, 5))
-        row.alignmentX = LEFT_ALIGNMENT
+        row.alignmentX = Component.LEFT_ALIGNMENT
         
         val labelComponent = JLabel(label)
         labelComponent.preferredSize = Dimension(180, 25)
@@ -110,19 +115,48 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
     private fun createGlobalFlagsSection(): JPanel {
         val panel = JPanel(BorderLayout(5, 5))
         panel.border = TitledBorder("Global Flags")
-        panel.alignmentX = LEFT_ALIGNMENT
+        panel.alignmentX = Component.LEFT_ALIGNMENT
         
-        val infoLabel = JLabel("<html>These flags are applied to ALL games.<br>Format: KEY=VALUE (one per line)<br>Per-game flags override global flags.</html>")
+        val infoLabel = JLabel("<html>These flags are applied to ALL games.<br>Per-game flags override global flags.</html>")
         infoLabel.border = EmptyBorder(5, 5, 10, 5)
         panel.add(infoLabel, BorderLayout.NORTH)
         
-        globalFlagsArea.font = Font("Monospaced", Font.PLAIN, 12)
-        globalFlagsArea.lineWrap = false
+        flagsTable.fillsViewportHeight = true
+        flagsTable.rowHeight = 25
         
-        val flagsText = currentSettings.globalFlags.entries.joinToString("\n") { "${it.key}=${it.value}" }
-        globalFlagsArea.text = flagsText
+        currentSettings.globalFlags.forEach { (key, value) ->
+            flagsTableModel.addRow(arrayOf(key, value))
+        }
         
-        panel.add(JScrollPane(globalFlagsArea), BorderLayout.CENTER)
+        val scrollPane = JScrollPane(flagsTable)
+        scrollPane.preferredSize = Dimension(500, 150)
+        
+        val tablePanel = JPanel(BorderLayout())
+        tablePanel.add(scrollPane, BorderLayout.CENTER)
+        
+        val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 5, 5))
+        
+        val addRowBtn = JButton("Add").apply {
+            preferredSize = Dimension(80, 28)
+            addActionListener {
+                flagsTableModel.addRow(arrayOf("", ""))
+            }
+        }
+        buttonPanel.add(addRowBtn)
+        
+        val removeRowBtn = JButton("Remove").apply {
+            preferredSize = Dimension(80, 28)
+            addActionListener {
+                val selectedRow = flagsTable.selectedRow
+                if (selectedRow >= 0) {
+                    flagsTableModel.removeRow(selectedRow)
+                }
+            }
+        }
+        buttonPanel.add(removeRowBtn)
+        
+        tablePanel.add(buttonPanel, BorderLayout.SOUTH)
+        panel.add(tablePanel, BorderLayout.CENTER)
         
         return panel
     }
@@ -153,13 +187,13 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
     private fun saveSettings() {
         try {
             val flags = mutableMapOf<String, String>()
-            globalFlagsArea.text.lines().forEach { line ->
-                val trimmed = line.trim()
-                if (trimmed.isNotEmpty() && trimmed.contains("=")) {
-                    val parts = trimmed.split("=", limit = 2)
-                    if (parts.size == 2) {
-                        flags[parts[0].trim()] = parts[1].trim()
-                    }
+            
+            for (i in 0 until flagsTableModel.rowCount) {
+                val key = (flagsTableModel.getValueAt(i, 0) as? String)?.trim() ?: ""
+                val value = (flagsTableModel.getValueAt(i, 1) as? String)?.trim() ?: ""
+                
+                if (key.isNotEmpty()) {
+                    flags[key] = value
                 }
             }
             
