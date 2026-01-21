@@ -164,27 +164,12 @@ class GameLauncher : JFrame("Styx") {
 
         val rightButtonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
 
-        val addNativeBtn = JButton("Add Native").apply {
-            preferredSize = Dimension(120, 32)
-            toolTipText = "Add Native Linux Game"
-            addActionListener { addNativeGame() }
+        val addBtn = JButton("Add").apply {
+            preferredSize = Dimension(100, 32)
+            toolTipText = "Add Game"
+            addActionListener { showAddGameMenu(this) }
         }
 
-        val addSteamBtn = JButton("Add Steam").apply {
-            preferredSize = Dimension(120, 32)
-            toolTipText = "Add Steam Game"
-            addActionListener { addSteamGame() }
-        }
-
-        val addBtn = JButton("Add Windows").apply {
-            preferredSize = Dimension(140, 32)
-            font = font.deriveFont(Font.PLAIN)
-            toolTipText = "Add Windows Game (Wine/Proton)"
-            addActionListener { addGame() }
-        }
-
-        rightButtonPanel.add(addNativeBtn)
-        rightButtonPanel.add(addSteamBtn)
         rightButtonPanel.add(addBtn)
 
         buttonRowPanel.add(leftButtonPanel, BorderLayout.WEST)
@@ -603,7 +588,7 @@ class GameLauncher : JFrame("Styx") {
 
             val scrollPane = JScrollPane(panel)
             scrollPane.verticalScrollBar.unitIncrement = 16
-            scrollPane.verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED
+            scrollPane.verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_ALWAYS
             scrollPane.horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
 
             tabbedPane.addTab(category, scrollPane)
@@ -882,6 +867,27 @@ class GameLauncher : JFrame("Styx") {
             e.printStackTrace()
             return null
         }
+    }
+
+    private fun showAddGameMenu(button: JButton) {
+        val popup = JPopupMenu()
+        
+        val windowsItem = JMenuItem("Windows Game").apply {
+            addActionListener { addGame() }
+        }
+        popup.add(windowsItem)
+        
+        val nativeItem = JMenuItem("Native Linux Game").apply {
+            addActionListener { addNativeGame() }
+        }
+        popup.add(nativeItem)
+        
+        val steamItem = JMenuItem("Steam Game").apply {
+            addActionListener { addSteamGame() }
+        }
+        popup.add(steamItem)
+        
+        popup.show(button, 0, button.height)
     }
 
     private fun removeGame() {
