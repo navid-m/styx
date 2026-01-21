@@ -316,11 +316,9 @@ class GameLauncher : JFrame("Styx") {
         val message = """
             <html>
             <h2>Styx v0.0.2</h2>
-            <br />
             <p>A game launcher for Linux</p>
-            <br>
-            <p>By Navid M</p>
             <br />
+            <p>By Navid M</p>
             <a href="https://github.com/navid-m/styx">github.com/navid-m/styx</a>
             </ul>
             </html>
