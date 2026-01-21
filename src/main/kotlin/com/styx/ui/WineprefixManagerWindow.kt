@@ -237,7 +237,7 @@ class WineprefixManagerWindow(private val parent: GameLauncher) : JFrame("Winepr
             if (name.isEmpty()) {
                 JOptionPane.showMessageDialog(
                     this,
-                    "Please enter a prefix name.",
+                    "Enter a prefix name.",
                     "Invalid Input",
                     JOptionPane.WARNING_MESSAGE
                 )
@@ -259,7 +259,7 @@ class WineprefixManagerWindow(private val parent: GameLauncher) : JFrame("Winepr
             }
 
             val progressDialog = JDialog(this, "Creating Prefix...", true)
-            val progressLabel = JLabel("Initializing wineprefix, please wait...")
+            val progressLabel = JLabel("Initializing wineprefix, wait...")
             progressLabel.border = EmptyBorder(20, 20, 20, 20)
             progressDialog.add(progressLabel)
             progressDialog.pack()
@@ -322,7 +322,7 @@ class WineprefixManagerWindow(private val parent: GameLauncher) : JFrame("Winepr
         if (selectedRow < 0) {
             JOptionPane.showMessageDialog(
                 this,
-                "Please select a prefix to rename.",
+                "Select a prefix to rename.",
                 "No Selection",
                 JOptionPane.WARNING_MESSAGE
             )
@@ -432,7 +432,7 @@ class WineprefixManagerWindow(private val parent: GameLauncher) : JFrame("Winepr
         if (selectedRow < 0) {
             JOptionPane.showMessageDialog(
                 this,
-                "Please select a prefix to delete.",
+                "Select a prefix to delete.",
                 "No Selection",
                 JOptionPane.WARNING_MESSAGE
             )
@@ -445,7 +445,7 @@ class WineprefixManagerWindow(private val parent: GameLauncher) : JFrame("Winepr
         if (name == "Default (~/.wine)") {
             JOptionPane.showMessageDialog(
                 this,
-                "Cannot delete the default wineprefix.\nPlease delete it manually if needed.",
+                "Cannot delete the default wineprefix.\nDelete it manually if needed.",
                 "Invalid Operation",
                 JOptionPane.WARNING_MESSAGE
             )
@@ -512,7 +512,7 @@ class WineprefixManagerWindow(private val parent: GameLauncher) : JFrame("Winepr
         if (selectedRow < 0) {
             JOptionPane.showMessageDialog(
                 this,
-                "Please select a prefix to open.",
+                "Select a prefix to open.",
                 "No Selection",
                 JOptionPane.WARNING_MESSAGE
             )

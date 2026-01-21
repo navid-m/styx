@@ -2,10 +2,16 @@ package com.styx.ui
 
 import com.styx.api.SteamApiHelper
 import com.styx.models.Game
+import com.styx.models.GameType
+import com.styx.utils.formatTimePlayed
+import java.awt.BorderLayout
 import java.awt.Color
+import java.awt.Desktop
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.Font
+import java.io.File
+import java.net.URI
 import javax.swing.BorderFactory
 import javax.swing.Box
 import javax.swing.BoxLayout
@@ -22,12 +28,13 @@ import javax.swing.border.EmptyBorder
 
 class GameConfigDialog(
     private val game: Game,
-    parent: JFrame,
+    private val launcher: GameLauncher,
     private val onLaunchOptions: (Game) -> Unit,
     private val onPrefixManager: (Game) -> Unit,
     private val onProtonManager: (Game) -> Unit,
-    private val onChangePrefix: (Game) -> Unit
-) : JDialog(parent, "Configure - ${game.name}", true) {
+    private val onChangePrefix: (Game) -> Unit,
+    private val onRename: (Game) -> Unit
+) : JDialog(launcher, "Configure - ${game.name}", true) {
 
     private val verboseCheckbox = JCheckBox("Enable Verbose Logging (show all Wine debug)", game.verboseLogging)
     private val steamAppIdInput = JTextField(20)
@@ -145,6 +152,72 @@ class GameConfigDialog(
 
         actionsPanel.add(changePrefixBtn)
         mainPanel.add(actionsPanel)
+        mainPanel.add(Box.createVerticalStrut(15))
+
+        val additionalActionsPanel = JPanel()
+        additionalActionsPanel.layout = BoxLayout(additionalActionsPanel, BoxLayout.Y_AXIS)
+        additionalActionsPanel.border = BorderFactory.createTitledBorder("Quick Actions")
+        additionalActionsPanel.alignmentX = LEFT_ALIGNMENT
+
+        val statsBtn = JButton("Show Statistics").apply {
+            maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
+            alignmentX = LEFT_ALIGNMENT
+            toolTipText = "View game statistics"
+            addActionListener {
+                showStatistics()
+            }
+        }
+        additionalActionsPanel.add(statsBtn)
+        additionalActionsPanel.add(Box.createVerticalStrut(8))
+
+        val renameBtn = JButton("Rename Game").apply {
+            maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
+            alignmentX = LEFT_ALIGNMENT
+            toolTipText = "Rename this game"
+            addActionListener {
+                renameGame()
+            }
+        }
+        additionalActionsPanel.add(renameBtn)
+        additionalActionsPanel.add(Box.createVerticalStrut(8))
+
+        val openGameLocationBtn = JButton("Open Game Location").apply {
+            maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
+            alignmentX = LEFT_ALIGNMENT
+            toolTipText = "Open the game's directory in file manager"
+            addActionListener {
+                openGameLocation()
+            }
+        }
+        additionalActionsPanel.add(openGameLocationBtn)
+
+        if (game.getGameType() == GameType.WINDOWS) {
+            additionalActionsPanel.add(Box.createVerticalStrut(8))
+            val openPrefixBtn = JButton("Open Wine Prefix Location").apply {
+                maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
+                alignmentX = LEFT_ALIGNMENT
+                toolTipText = "Open the wine prefix directory"
+                addActionListener {
+                    openPrefixLocation()
+                }
+            }
+            additionalActionsPanel.add(openPrefixBtn)
+
+            if (!game.steamAppId.isNullOrEmpty()) {
+                additionalActionsPanel.add(Box.createVerticalStrut(8))
+                val protonDbBtn = JButton("Open ProtonDB Page").apply {
+                    maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
+                    alignmentX = LEFT_ALIGNMENT
+                    toolTipText = "Open this game's ProtonDB page"
+                    addActionListener {
+                        openProtonDB()
+                    }
+                }
+                additionalActionsPanel.add(protonDbBtn)
+            }
+        }
+
+        mainPanel.add(additionalActionsPanel)
         mainPanel.add(Box.createVerticalGlue())
 
         val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
@@ -222,5 +295,145 @@ class GameConfigDialog(
         }.start()
 
         progressDialog.isVisible = true
+    }
+
+    private fun showStatistics() {
+        val statsWindow = JDialog(this, "Stats - ${game.name}", true)
+        statsWindow.defaultCloseOperation = JDialog.DISPOSE_ON_CLOSE
+        statsWindow.setSize(400, 400)
+        statsWindow.minimumSize = Dimension(400, 400)
+        statsWindow.setLocationRelativeTo(this)
+
+        val mainPanel = JPanel(BorderLayout())
+        mainPanel.border = EmptyBorder(20, 20, 20, 20)
+        mainPanel.background = Color(34, 35, 36)
+
+        val titleLabel = JLabel("Statistics for ${game.name}")
+        titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
+        titleLabel.border = EmptyBorder(0, 0, 20, 0)
+        titleLabel.foreground = launcher.globalSettings.theme.getGameTitleColorObject()
+        mainPanel.add(titleLabel, BorderLayout.NORTH)
+
+        val tableData = arrayOf(
+            arrayOf("Time Played", formatTimePlayed(game.timePlayed)),
+            arrayOf("Times Opened", game.timesOpened.toString()),
+            arrayOf("Times Crashed", game.timesCrashed.toString()),
+            arrayOf("Wineprefix Path", game.prefix),
+            arrayOf("Compatibility Layer", game.protonVersion ?: "Wine (default)")
+        )
+
+        val columnNames = arrayOf("Statistic", "Value")
+        val tableModel = javax.swing.table.DefaultTableModel(tableData, columnNames)
+        val table = javax.swing.JTable(tableModel)
+        table.font = table.font.deriveFont(14f)
+        table.rowHeight = 30
+        table.setEnabled(false)
+
+        val scrollPane = javax.swing.JScrollPane(table)
+        mainPanel.add(scrollPane, BorderLayout.CENTER)
+
+        statsWindow.contentPane = mainPanel
+        statsWindow.isVisible = true
+    }
+
+    private fun renameGame() {
+        val newName = JOptionPane.showInputDialog(
+            this,
+            "Enter new name for '${game.name}':",
+            "Rename Game",
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            null,
+            game.name
+        ) as? String
+
+        if (newName != null && newName.isNotBlank() && newName != game.name) {
+            game.name = newName
+            onRename(game)
+            title = "Configure - ${game.name}"
+        }
+    }
+
+    private fun openGameLocation() {
+        if (game.getGameType() == GameType.STEAM) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Steam App ID: ${game.executable}\nThis game is launched via Steam.",
+                "Steam Game Info",
+                JOptionPane.INFORMATION_MESSAGE
+            )
+            return
+        }
+
+        val gameFile = File(game.executable)
+        val gameDirectory = gameFile.parentFile
+
+        if (gameDirectory != null && gameDirectory.exists()) {
+            try {
+                if (Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().open(gameDirectory)
+                } else {
+                    ProcessBuilder("xdg-open", gameDirectory.absolutePath).start()
+                }
+            } catch (e: Exception) {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to open game location: ${e.message}",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+                )
+            }
+        } else {
+            JOptionPane.showMessageDialog(
+                this,
+                "Game location not found: ${gameDirectory?.absolutePath ?: game.executable}",
+                "Error",
+                JOptionPane.ERROR_MESSAGE
+            )
+        }
+    }
+
+    private fun openPrefixLocation() {
+        val prefixDirectory = File(game.prefix)
+
+        if (prefixDirectory.exists()) {
+            try {
+                if (Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().open(prefixDirectory)
+                } else {
+                    ProcessBuilder("xdg-open", prefixDirectory.absolutePath).start()
+                }
+            } catch (e: Exception) {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to open wine prefix location: ${e.message}",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+                )
+            }
+        } else {
+            JOptionPane.showMessageDialog(
+                this,
+                "Wine prefix not found: ${game.prefix}",
+                "Error",
+                JOptionPane.ERROR_MESSAGE
+            )
+        }
+    }
+
+    private fun openProtonDB() {
+        if (!game.steamAppId.isNullOrEmpty()) {
+            try {
+                val uri = URI("https://www.protondb.com/app/${game.steamAppId}")
+                Desktop.getDesktop().browse(uri)
+            } catch (e: Exception) {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to open ProtonDB: ${e.message}",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+                )
+            }
+        }
     }
 }

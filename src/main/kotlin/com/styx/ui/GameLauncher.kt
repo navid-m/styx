@@ -973,7 +973,8 @@ class GameLauncher : JFrame("Styx") {
             ::openLaunchOptions,
             ::openPrefixManager,
             ::openProtonManager,
-            ::changeGamePrefix
+            ::changeGamePrefix,
+            ::renameGame
         )
         dialog.isVisible = true
         saveGames()
