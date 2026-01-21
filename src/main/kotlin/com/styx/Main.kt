@@ -24,6 +24,34 @@ import com.styx.models.GameType
 import com.styx.models.PrefixInfo
 
 /**
+ * Helper object for Steam API operations
+ */
+object SteamApiHelper {
+    data class SteamSearchResult(val appid: String, val name: String)
+
+    fun searchGameByName(gameName: String): List<SteamSearchResult> {
+        try {
+            val encodedName = java.net.URLEncoder.encode(gameName, "UTF-8")
+            val url = java.net.URL("https://steamcommunity.com/actions/SearchApps/$encodedName")
+            val connection = url.openConnection() as java.net.HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+
+            val response = connection.inputStream.bufferedReader().use { it.readText() }
+            val gson = Gson()
+            val listType = object : com.google.gson.reflect.TypeToken<List<SteamSearchResult>>() {}.type
+            val results: List<SteamSearchResult> = gson.fromJson(response, listType)
+
+            return results.take(10)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return emptyList()
+        }
+    }
+}
+
+/**
  * Wineserver Management Window
  * Displays running wineserver processes and allows killing them
  */
@@ -907,6 +935,7 @@ class GameConfigDialog(
 ) : JDialog(parent, "Configure - ${game.name}", true) {
 
     private val verboseCheckbox = JCheckBox("Enable Verbose Logging (show all Wine debug)", game.verboseLogging)
+    private val steamAppIdInput = JTextField(20)
 
     init {
         initUI()
@@ -942,6 +971,34 @@ class GameConfigDialog(
         loggingPanel.add(loggingInfoLabel)
 
         mainPanel.add(loggingPanel)
+        mainPanel.add(Box.createVerticalStrut(15))
+
+        val protonDbPanel = JPanel()
+        protonDbPanel.layout = BoxLayout(protonDbPanel, BoxLayout.Y_AXIS)
+        protonDbPanel.border = BorderFactory.createTitledBorder("ProtonDB Integration")
+        protonDbPanel.alignmentX = Component.LEFT_ALIGNMENT
+
+        val steamIdPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
+        steamIdPanel.add(JLabel("Steam App ID:"))
+        steamAppIdInput.text = game.steamAppId ?: ""
+        steamIdPanel.add(steamAppIdInput)
+
+        val findSteamIdBtn = JButton("Find").apply {
+            preferredSize = Dimension(80, 28)
+            toolTipText = "Search Steam for this game"
+            addActionListener { findSteamAppId() }
+        }
+        steamIdPanel.add(findSteamIdBtn)
+
+        val pdbInfoLabel = JLabel("<html><small>Enter Steam App ID to enable ProtonDB button</small></html>")
+        pdbInfoLabel.foreground = Color(0x88, 0x88, 0x88)
+        pdbInfoLabel.alignmentX = Component.LEFT_ALIGNMENT
+
+        protonDbPanel.add(steamIdPanel)
+        protonDbPanel.add(Box.createVerticalStrut(5))
+        protonDbPanel.add(pdbInfoLabel)
+
+        mainPanel.add(protonDbPanel)
         mainPanel.add(Box.createVerticalStrut(15))
 
         val actionsPanel = JPanel()
@@ -1003,6 +1060,7 @@ class GameConfigDialog(
             preferredSize = Dimension(80, 32)
             addActionListener {
                 game.verboseLogging = verboseCheckbox.isSelected
+                game.steamAppId = steamAppIdInput.text.trim().takeIf { it.isNotEmpty() }
                 dispose()
             }
         }
@@ -1021,6 +1079,54 @@ class GameConfigDialog(
         contentPane = mainPanel
         pack()
         setLocationRelativeTo(parent)
+    }
+
+    private fun findSteamAppId() {
+        val gameName = game.name
+
+        val progressDialog = JDialog(this, "Searching Steam...", true)
+        val progressLabel = JLabel("Searching for '$gameName' on Steam...")
+        progressLabel.border = EmptyBorder(20, 20, 20, 20)
+        progressDialog.contentPane.add(progressLabel)
+        progressDialog.pack()
+        progressDialog.setLocationRelativeTo(this)
+
+        Thread {
+            val results = SteamApiHelper.searchGameByName(gameName)
+
+            SwingUtilities.invokeLater {
+                progressDialog.dispose()
+
+                if (results.isEmpty()) {
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "No results found for '$gameName'.",
+                        "No Results",
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                } else {
+                    val options = results.map { "${it.name} (${it.appid})" }.toTypedArray()
+                    val selected = JOptionPane.showInputDialog(
+                        this,
+                        "Select the correct game:",
+                        "Steam Search Results",
+                        JOptionPane.QUESTION_MESSAGE,
+                        null,
+                        options,
+                        options[0]
+                    )
+
+                    if (selected != null) {
+                        val selectedIndex = options.indexOf(selected)
+                        if (selectedIndex >= 0) {
+                            steamAppIdInput.text = results[selectedIndex].appid
+                        }
+                    }
+                }
+            }
+        }.start()
+
+        progressDialog.isVisible = true
     }
 }
 
@@ -1413,6 +1519,7 @@ class AddGameDialog(
     private val nameInput = JTextField(30)
     private val exeInput = JTextField(30)
     private val prefixCombo = JComboBox<PrefixComboItem>()
+    private val steamAppIdInput = JTextField(20)
     var gameData: Game? = null
 
     init {
@@ -1461,6 +1568,25 @@ class AddGameDialog(
         }
         prefixPanel.add(browsePrefixBtn)
         mainPanel.add(prefixPanel)
+
+        val steamAppIdPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
+        val steamAppIdLabel = JLabel("Steam App ID:")
+        steamAppIdLabel.preferredSize = Dimension(100, 25)
+        steamAppIdPanel.add(steamAppIdLabel)
+        steamAppIdPanel.add(steamAppIdInput)
+
+        val findSteamIdBtn = JButton("Find").apply {
+            preferredSize = Dimension(80, 28)
+            toolTipText = "Search Steam for this game"
+            addActionListener { findSteamAppId() }
+        }
+        steamAppIdPanel.add(findSteamIdBtn)
+
+        val infoLabel = JLabel("(Optional)")
+        infoLabel.foreground = Color(0x88, 0x88, 0x88)
+        infoLabel.font = infoLabel.font.deriveFont(10f)
+        steamAppIdPanel.add(infoLabel)
+        mainPanel.add(steamAppIdPanel)
 
         mainPanel.add(Box.createVerticalStrut(10))
 
@@ -1518,6 +1644,7 @@ class AddGameDialog(
         val exePath = exeInput.text.trim()
         val selected = prefixCombo.selectedItem as? PrefixComboItem
         val prefixPath = selected?.path
+        val steamAppId = steamAppIdInput.text.trim().takeIf { it.isNotEmpty() }
 
         if (name.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Enter a game name.", "Invalid Input", JOptionPane.WARNING_MESSAGE)
@@ -1544,8 +1671,65 @@ class AddGameDialog(
             return
         }
 
-        gameData = Game(name, exePath, prefixPath)
+        gameData = Game(name, exePath, prefixPath, steamAppId = steamAppId)
         dispose()
+    }
+
+    private fun findSteamAppId() {
+        val gameName = nameInput.text.trim()
+        if (gameName.isEmpty()) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Please enter a game name first.",
+                "No Game Name",
+                JOptionPane.WARNING_MESSAGE
+            )
+            return
+        }
+
+        val progressDialog = JDialog(this, "Searching Steam...", true)
+        val progressLabel = JLabel("Searching for '$gameName' on Steam...")
+        progressLabel.border = EmptyBorder(20, 20, 20, 20)
+        progressDialog.contentPane.add(progressLabel)
+        progressDialog.pack()
+        progressDialog.setLocationRelativeTo(this)
+
+        Thread {
+            val results = SteamApiHelper.searchGameByName(gameName)
+
+            SwingUtilities.invokeLater {
+                progressDialog.dispose()
+
+                if (results.isEmpty()) {
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "No results found for '$gameName'.",
+                        "No Results",
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                } else {
+                    val options = results.map { "${it.name} (${it.appid})" }.toTypedArray()
+                    val selected = JOptionPane.showInputDialog(
+                        this,
+                        "Select the correct game:",
+                        "Steam Search Results",
+                        JOptionPane.QUESTION_MESSAGE,
+                        null,
+                        options,
+                        options[0]
+                    )
+
+                    if (selected != null) {
+                        val selectedIndex = options.indexOf(selected)
+                        if (selectedIndex >= 0) {
+                            steamAppIdInput.text = results[selectedIndex].appid
+                        }
+                    }
+                }
+            }
+        }.start()
+
+        progressDialog.isVisible = true
     }
 
     data class PrefixComboItem(val name: String, val path: String) {
@@ -1952,6 +2136,15 @@ class GameItemWidgetWithImage(
                 }
             }
             popupMenu.add(openPrefixLocationItem)
+
+            if (!game.steamAppId.isNullOrEmpty()) {
+                val protonDbItem = JMenuItem("Proton DB").apply {
+                    addActionListener {
+                        openProtonDB()
+                    }
+                }
+                popupMenu.add(protonDbItem)
+            }
         }
 
         if (game.getGameType() == GameType.NATIVE_LINUX || game.getGameType() == GameType.STEAM) {
@@ -2060,6 +2253,22 @@ class GameItemWidgetWithImage(
         if (newName != null && newName.isNotBlank() && newName != game.name) {
             game.name = newName
             onRename(game)
+        }
+    }
+
+    private fun openProtonDB() {
+        if (!game.steamAppId.isNullOrEmpty()) {
+            try {
+                val uri = java.net.URI("https://www.protondb.com/app/${game.steamAppId}")
+                java.awt.Desktop.getDesktop().browse(uri)
+            } catch (e: Exception) {
+                JOptionPane.showMessageDialog(
+                    this,
+                    "Failed to open ProtonDB: ${e.message}",
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+                )
+            }
         }
     }
 

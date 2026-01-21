@@ -14,7 +14,8 @@ data class Game(
     var timesCrashed: Int = 0,
     var type: GameType? = null,
     var verboseLogging: Boolean = false,
-    var category: String = "All"
+    var category: String = "All",
+    var steamAppId: String? = null
 ) {
     /**
      * Helper to get game type.
