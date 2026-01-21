@@ -36,6 +36,7 @@ import javax.swing.BorderFactory
 import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.JButton
+import javax.swing.JComponent
 import javax.swing.JFrame
 import javax.swing.JLabel
 import javax.swing.JMenu
@@ -200,6 +201,17 @@ class GameLauncher : JFrame("Styx") {
         mainPanel.add(fullBottomPanel, BorderLayout.SOUTH)
 
         contentPane = mainPanel
+
+        val inputMap = rootPane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+        val actionMap = rootPane.actionMap
+        
+        inputMap.put(KeyStroke.getKeyStroke(';'), "focusSearch")
+        actionMap.put("focusSearch", object : javax.swing.AbstractAction() {
+            override fun actionPerformed(e: java.awt.event.ActionEvent?) {
+                searchField.requestFocusInWindow()
+                searchField.selectAll()
+            }
+        })
 
         pack()
         setLocationRelativeTo(null)
