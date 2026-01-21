@@ -274,9 +274,14 @@ class GameOutputWindow(
         val topPanel = JPanel(FlowLayout(FlowLayout.LEFT, 10, 5))
         topPanel.add(hideDebugCheckbox)
         hideDebugCheckbox.toolTipText = "When enabled, prevents output from being captured to improve game performance"
+        hideDebugCheckbox.addActionListener {
+            updateOutputDisplay()
+        }
         contentPanel.add(topPanel, BorderLayout.NORTH)
-        
+
         contentPanel.add(titleLabel, BorderLayout.NORTH)
+
+        updateOutputDisplay()
         outputText.isEditable = false
         outputText.font = Font("Monospaced", Font.PLAIN, 9)
         outputText.lineWrap = false
@@ -340,8 +345,33 @@ class GameOutputWindow(
         updateTimer?.start()
     }
 
+    private fun updateOutputDisplay() {
+        SwingUtilities.invokeLater {
+            if (!isClosing) {
+                if (hideDebugCheckbox.isSelected) {
+                    outputText.text =
+                        "\n\n    (Tumbleweed)\n\n    All output is hidden.\n\n    To re-enable logs, go to the game configuration."
+                } else {
+                    synchronized(displayBuffer) {
+                        val linesToDisplay = displayBuffer.takeLast(maxDisplayLines)
+                        val text = linesToDisplay.joinToString("\n")
+                        outputText.text = text
+                        if (text.isNotEmpty()) {
+                            outputText.caretPosition = outputText.text.length
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private fun updateUI() {
         if (!needsUIUpdate || isClosing) return
+
+        if (hideDebugCheckbox.isSelected) {
+            needsUIUpdate = false
+            return
+        }
 
         synchronized(displayBuffer) {
             if (displayBuffer.isEmpty()) return
