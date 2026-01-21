@@ -466,6 +466,17 @@ class GameLauncher : JFrame("Styx") {
     }
 
     private fun refreshGamesList(filter: String?) {
+        val scrollPositions = mutableMapOf<String, Int>()
+        val currentTabIndex = tabbedPane.selectedIndex
+        
+        for (i in 0 until tabbedPane.tabCount) {
+            val categoryName = tabbedPane.getTitleAt(i)
+            val scrollPane = tabbedPane.getComponentAt(i) as? JScrollPane
+            scrollPane?.let {
+                scrollPositions[categoryName] = it.verticalScrollBar.value
+            }
+        }
+        
         tabbedPane.removeAll()
         categoryPanels.clear()
 
@@ -538,6 +549,21 @@ class GameLauncher : JFrame("Styx") {
         })
 
         setupTabDropTargets()
+
+        if (currentTabIndex >= 0 && currentTabIndex < tabbedPane.tabCount) {
+            tabbedPane.selectedIndex = currentTabIndex
+        }
+        
+        SwingUtilities.invokeLater {
+            for (i in 0 until tabbedPane.tabCount) {
+                val categoryName = tabbedPane.getTitleAt(i)
+                val scrollPane = tabbedPane.getComponentAt(i) as? JScrollPane
+                val savedPosition = scrollPositions[categoryName]
+                if (scrollPane != null && savedPosition != null) {
+                    scrollPane.verticalScrollBar.value = savedPosition
+                }
+            }
+        }
 
         tabbedPane.revalidate()
         tabbedPane.repaint()
