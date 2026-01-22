@@ -1,5 +1,6 @@
 package com.styx.ui
 
+import com.styx.api.SteamApiHelper
 import com.styx.models.Game
 import com.styx.models.GameType
 import java.awt.Dimension
@@ -13,6 +14,7 @@ import javax.swing.JLabel
 import javax.swing.JOptionPane
 import javax.swing.JPanel
 import javax.swing.JTextField
+import javax.swing.SwingUtilities
 import javax.swing.border.EmptyBorder
 
 class AddSteamGameDialog(parent: JFrame) : JDialog(parent, "Add Steam Game", true) {
@@ -43,6 +45,14 @@ class AddSteamGameDialog(parent: JFrame) : JDialog(parent, "Add Steam Game", tru
         steamIdLabel.preferredSize = Dimension(100, 25)
         steamIdPanel.add(steamIdLabel)
         steamIdPanel.add(steamIdInput)
+        
+        val autodetectBtn = JButton("Autodetect").apply {
+            preferredSize = Dimension(100, 28)
+            toolTipText = "Search Steam for this game by name"
+            addActionListener { autodetectSteamAppId() }
+        }
+        steamIdPanel.add(autodetectBtn)
+        
         mainPanel.add(steamIdPanel)
 
         val helpLabel = JLabel("<html><i>Example: For Counter-Strike 2, use 730</i></html>")
@@ -104,5 +114,65 @@ class AddSteamGameDialog(parent: JFrame) : JDialog(parent, "Add Steam Game", tru
 
         gameData = Game(name, steamAppId, "", type = GameType.STEAM)
         dispose()
+    }
+
+    private fun autodetectSteamAppId() {
+        val gameName = nameInput.text.trim()
+        if (gameName.isEmpty()) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Enter a game name first.",
+                "No Game Name",
+                JOptionPane.WARNING_MESSAGE
+            )
+            return
+        }
+
+        val progressDialog = JDialog(this, "Searching Steam...", true)
+        val progressLabel = JLabel("Searching for '$gameName' on Steam...")
+        progressLabel.border = EmptyBorder(20, 20, 20, 20)
+        progressDialog.contentPane.add(progressLabel)
+        progressDialog.pack()
+        progressDialog.setLocationRelativeTo(this)
+
+        Thread {
+            val results = SteamApiHelper.searchGameByName(gameName)
+
+            SwingUtilities.invokeLater {
+                progressDialog.dispose()
+
+                if (results.isEmpty()) {
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "No results found for '$gameName'.",
+                        "No Results",
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                } else {
+                    val options = results.map { "${it.name} (${it.appid})" }.toTypedArray()
+                    val selected = JOptionPane.showInputDialog(
+                        this,
+                        "Select the correct game:",
+                        "Steam Search Results",
+                        JOptionPane.QUESTION_MESSAGE,
+                        null,
+                        options,
+                        options[0]
+                    )
+
+                    if (selected != null) {
+                        val selectedIndex = options.indexOf(selected)
+                        if (selectedIndex >= 0) {
+                            steamIdInput.text = results[selectedIndex].appid
+                            if (nameInput.text.trim().isEmpty() || nameInput.text.trim() == gameName) {
+                                nameInput.text = results[selectedIndex].name
+                            }
+                        }
+                    }
+                }
+            }
+        }.start()
+
+        progressDialog.isVisible = true
     }
 }

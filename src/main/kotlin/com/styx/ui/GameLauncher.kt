@@ -1292,23 +1292,36 @@ class GameLauncher : JFrame("Styx") {
         outputWindow.appendOutput("")
 
         try {
-            val steamUrl = "steam://rungameid/$steamAppId"
             outputWindow.appendOutput("=== Starting Steam ===", "#0066cc")
-            outputWindow.appendOutput("Opening: $steamUrl")
+            outputWindow.appendOutput("Launching game with App ID: $steamAppId")
             outputWindow.appendOutput("")
 
-            val processBuilder = ProcessBuilder("xdg-open", steamUrl)
+            val processBuilder = ProcessBuilder("steam", "steam://rungameid/$steamAppId")
+            processBuilder.redirectErrorStream(true)
             val process = processBuilder.start()
 
             game.timesOpened++
 
             Thread {
-                process.waitFor()
+                val reader = process.inputStream.bufferedReader()
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    val output = line!!
+                    SwingUtilities.invokeLater {
+                        outputWindow.appendOutput(output)
+                    }
+                }
+                
+                val exitCode = process.waitFor()
 
                 SwingUtilities.invokeLater {
                     outputWindow.appendOutput("")
                     outputWindow.appendOutput("═".repeat(60), "#0066cc")
-                    outputWindow.appendOutput("Steam launcher opened successfully", "#00aa00")
+                    if (exitCode == 0) {
+                        outputWindow.appendOutput("Steam launcher opened successfully", "#00aa00")
+                    } else {
+                        outputWindow.appendOutput("Steam launcher exited with code: $exitCode", "#cc8800")
+                    }
                     outputWindow.appendOutput("Note: Game will launch through Steam client", "#0066cc")
                     outputWindow.appendOutput("═".repeat(60), "#0066cc")
                     saveGames()
