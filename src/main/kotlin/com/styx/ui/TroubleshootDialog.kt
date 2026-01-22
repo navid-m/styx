@@ -159,6 +159,7 @@ class TroubleshootDialog(
                 add(::checkLocaleSettings)
                 add(::checkEsyncSupport)
                 add(::checkFsyncSupport)
+                add(::checkVerboseLoggingFsyncIssue)
                 add(::checkGameFilesIntegrity)
                 add(::checkWineDllOverrides)
                 add(::checkFontConfiguration)
@@ -1086,6 +1087,30 @@ class TroubleshootDialog(
                     "Fsync Support",
                     DiagnosticStatus.INFO,
                     "Could not check fsync support",
+                    ""
+                )
+            )
+        }
+    }
+
+    private fun checkVerboseLoggingFsyncIssue() {
+        if (game.getGameType() != GameType.WINDOWS) return
+
+        if (game.wineLogLevel.contains("+all")) {
+            addResult(
+                DiagnosticResult(
+                    "Verbose Logging Warning",
+                    DiagnosticStatus.WARNING,
+                    "Game has verbose logging enabled",
+                    "Verbose logging may cause fsync permission issues and prevent game startup. Consider disabling verbose logging if experiencing launch failures."
+                )
+            )
+        } else {
+            addResult(
+                DiagnosticResult(
+                    "Verbose Logging",
+                    DiagnosticStatus.PASS,
+                    "Verbose logging is disabled",
                     ""
                 )
             )
