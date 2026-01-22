@@ -42,17 +42,19 @@ class GameConfigDialog(
         "Default (warn+all,fixme-all)" to "warn+all,fixme-all",
         "Verbose (+all)" to "+all"
     )
-    
+
     private val logLevelComboBox = JComboBox(wineLogLevels.keys.toTypedArray())
     private val steamAppIdInput = JTextField(20)
+    private val cpuGovernorComboBox =
+        JComboBox(arrayOf("Default (system)", "performance", "powersave", "ondemand", "conservative", "schedutil"))
 
     init {
         initUI()
     }
 
     private fun initUI() {
-        minimumSize = Dimension(450, 450)
-
+        minimumSize = Dimension(450, 950)
+        preferredSize = Dimension(450, 950)
         val mainPanel = JPanel()
         mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
         mainPanel.border = EmptyBorder(15, 15, 15, 15)
@@ -70,17 +72,17 @@ class GameConfigDialog(
 
         val logLevelPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
         logLevelPanel.add(JLabel("Log Level:"))
-        
+
         val currentLogLevel = if (game.verboseLogging) {
             "+all"
         } else {
             game.wineLogLevel
         }
-        
+
         wineLogLevels.entries.find { it.value == currentLogLevel }?.let { entry ->
             logLevelComboBox.selectedItem = entry.key
         }
-        
+
         logLevelPanel.add(logLevelComboBox)
         loggingPanel.add(logLevelPanel)
         loggingPanel.add(Box.createVerticalStrut(5))
@@ -92,6 +94,34 @@ class GameConfigDialog(
         loggingPanel.add(loggingInfoLabel)
 
         mainPanel.add(loggingPanel)
+        mainPanel.add(Box.createVerticalStrut(15))
+
+        val cpuGovernorPanel = JPanel()
+        cpuGovernorPanel.layout = BoxLayout(cpuGovernorPanel, BoxLayout.Y_AXIS)
+        cpuGovernorPanel.border = BorderFactory.createTitledBorder("CPU Governor")
+        cpuGovernorPanel.alignmentX = LEFT_ALIGNMENT
+
+        val governorPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
+        governorPanel.add(JLabel("Governor:"))
+
+        val currentGovernor = game.cpuGovernor
+        if (currentGovernor != null) {
+            cpuGovernorComboBox.selectedItem = currentGovernor
+        } else {
+            cpuGovernorComboBox.selectedItem = "Default (system)"
+        }
+
+        governorPanel.add(cpuGovernorComboBox)
+        cpuGovernorPanel.add(governorPanel)
+        cpuGovernorPanel.add(Box.createVerticalStrut(5))
+
+        val governorInfoLabel =
+            JLabel("<html><small>Control CPU frequency scaling for this game (requires root privileges)</small></html>")
+        governorInfoLabel.foreground = Color(0x88, 0x88, 0x88)
+        governorInfoLabel.alignmentX = LEFT_ALIGNMENT
+        cpuGovernorPanel.add(governorInfoLabel)
+
+        mainPanel.add(cpuGovernorPanel)
         mainPanel.add(Box.createVerticalStrut(15))
 
         val protonDbPanel = JPanel()
@@ -261,6 +291,13 @@ class GameConfigDialog(
                 game.wineLogLevel = wineLogLevels[selectedLogLevel] ?: "warn+all,fixme-all"
                 game.verboseLogging = false
                 game.steamAppId = steamAppIdInput.text.trim().takeIf { it.isNotEmpty() }
+
+                val selectedGovernor = cpuGovernorComboBox.selectedItem as? String
+                game.cpuGovernor = when (selectedGovernor) {
+                    "Default (system)" -> null
+                    else -> selectedGovernor
+                }
+
                 dispose()
             }
         }

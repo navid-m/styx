@@ -20,7 +20,8 @@ data class Game(
     var verboseLogging: Boolean = false,
     var wineLogLevel: String = "warn+all,fixme-all",
     var category: String = "All",
-    var steamAppId: String? = null
+    var steamAppId: String? = null,
+    var cpuGovernor: String? = null
 ) {
     /**
      * Helper to get game type.

@@ -67,6 +67,7 @@ class GameLauncher : JFrame("Styx") {
     private val configFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "games.json")
     private val categoriesFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "categories.json")
     private val settingsFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "settings.json")
+    private val originalGovernors = mutableMapOf<String, String>()
     private val gameProcesses = mutableMapOf<String, Process>()
     private val outputWindows = mutableMapOf<String, GameOutputWindow>()
     private val tabbedPane = JTabbedPane()
@@ -428,6 +429,55 @@ class GameLauncher : JFrame("Styx") {
                 "Error",
                 JOptionPane.WARNING_MESSAGE
             )
+        }
+    }
+
+    private fun setCPUGovernor(governor: String, gameName: String): Boolean {
+        try {
+            val cpuCount = Runtime.getRuntime().availableProcessors()
+            
+            for (cpu in 0 until cpuCount) {
+                try {
+                    val governorFile = File("/sys/devices/system/cpu/cpu$cpu/cpufreq/scaling_governor")
+                    if (governorFile.exists()) {
+                        val original = governorFile.readText().trim()
+                        originalGovernors["$gameName-cpu$cpu"] = original
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+            
+            val pb = ProcessBuilder("pkexec", "sh", "-c",
+                "for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo $governor > \$cpu; done")
+            val process = pb.start()
+            val exitCode = process.waitFor()
+            return exitCode == 0
+        } catch (e: Exception) {
+            return false
+        }
+    }
+
+    private fun restoreCPUGovernor(gameName: String) {
+        try {
+            val cpuCount = Runtime.getRuntime().availableProcessors()
+            val commands = mutableListOf<String>()
+            
+            for (cpu in 0 until cpuCount) {
+                val original = originalGovernors["$gameName-cpu$cpu"]
+                if (original != null) {
+                    commands.add("echo $original > /sys/devices/system/cpu/cpu$cpu/cpufreq/scaling_governor")
+                    originalGovernors.remove("$gameName-cpu$cpu")
+                }
+            }
+            
+            if (commands.isNotEmpty()) {
+                val pb = ProcessBuilder("pkexec", "sh", "-c", commands.joinToString("; "))
+                val process = pb.start()
+                process.waitFor()
+            }
+        } catch (e: Exception) {
+            // Ignore
         }
     }
 
@@ -1364,6 +1414,18 @@ class GameLauncher : JFrame("Styx") {
 
         outputWindow.appendOutput("")
 
+        val cpuGovernor = game.cpuGovernor
+        if (cpuGovernor != null) {
+            outputWindow.appendOutput("=== CPU Governor ===", "#0066cc")
+            outputWindow.appendOutput("Setting CPU governor to: $cpuGovernor")
+            if (setCPUGovernor(cpuGovernor, gameName)) {
+                outputWindow.appendOutput("CPU governor set successfully", "#008800")
+            } else {
+                outputWindow.appendOutput("WARNING: Failed to set CPU governor (may need polkit)", "#cc6600")
+            }
+            outputWindow.appendOutput("")
+        }
+
         try {
             val processBuilder = ProcessBuilder()
             val env = processBuilder.environment()
@@ -1577,6 +1639,8 @@ class GameLauncher : JFrame("Styx") {
                             gameStartTimes.remove(gameName)
                         }
 
+                        restoreCPUGovernor(gameName)
+
                         outputWindow.appendOutput("")
                         outputWindow.appendOutput("═".repeat(60), "#0066cc")
                         outputWindow.appendOutput("PROCESS FINISHED", "#0066cc")
@@ -1656,6 +1720,8 @@ class GameLauncher : JFrame("Styx") {
                 outputWindow?.appendOutput("Process terminated.", "#cc0000")
                 outputWindow?.disableAbortButton()
 
+                restoreCPUGovernor(gameName)
+
                 val startTime = gameStartTimes[gameName]
                 if (startTime != null) {
                     val endTime = System.currentTimeMillis()
@@ -1706,6 +1772,11 @@ class GameLauncher : JFrame("Styx") {
 
     private fun cleanup() {
         isShuttingDown = true
+
+        originalGovernors.keys.toList().forEach { key ->
+            val gameName = key.substringBefore("-cpu")
+            restoreCPUGovernor(gameName)
+        }
 
         outputWindows.values.forEach { window ->
             try {
