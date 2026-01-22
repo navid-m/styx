@@ -8,7 +8,7 @@ import java.nio.file.Files
 import javax.swing.SwingUtilities
 
 class LutrisScriptRunner(
-    private val script: LutrisScript,
+    private val script: InstallScript,
     private val gameDir: String,
     private val outputCallback: (String, String?) -> Unit
 ) {
@@ -81,7 +81,7 @@ class LutrisScriptRunner(
         return true
     }
     
-    private fun executeTask(task: LutrisTaskDetails): Boolean {
+    private fun executeTask(task: ScriptableTaskDetails): Boolean {
         return when (task.name) {
             "create_prefix" -> createPrefix(task)
             "winetricks" -> runWinetricks(task)
@@ -94,7 +94,7 @@ class LutrisScriptRunner(
         }
     }
     
-    private fun createPrefix(task: LutrisTaskDetails): Boolean {
+    private fun createPrefix(task: ScriptableTaskDetails): Boolean {
         val prefix = resolveVariable(task.prefix ?: gameDir)
         val arch = task.arch ?: "win64"
         
@@ -131,7 +131,7 @@ class LutrisScriptRunner(
         }
     }
     
-    private fun runWinetricks(task: LutrisTaskDetails): Boolean {
+    private fun runWinetricks(task: ScriptableTaskDetails): Boolean {
         val prefix = resolveVariable(task.prefix ?: gameDir)
         val apps = task.app?.split(" ") ?: emptyList()
         
@@ -176,7 +176,7 @@ class LutrisScriptRunner(
         }
     }
     
-    private fun runWineExec(task: LutrisTaskDetails): Boolean {
+    private fun runWineExec(task: ScriptableTaskDetails): Boolean {
         val prefix = resolveVariable(task.prefix ?: gameDir)
         val executableId = task.executable ?: run {
             outputCallback("ERROR: No executable specified", "#cc0000")
@@ -230,7 +230,7 @@ class LutrisScriptRunner(
         }
     }
     
-    private fun runWineKill(task: LutrisTaskDetails): Boolean {
+    private fun runWineKill(task: ScriptableTaskDetails): Boolean {
         val prefix = resolveVariable(task.prefix ?: gameDir)
         
         outputCallback("Killing all Wine processes in prefix...", null)
@@ -257,7 +257,7 @@ class LutrisScriptRunner(
     }
     
     companion object {
-        fun parseYaml(yamlContent: String): LutrisScript? {
+        fun parseYaml(yamlContent: String): InstallScript? {
             return try {
                 val yaml = Yaml()
                 val data = yaml.load<Map<String, Any>>(yamlContent)
@@ -286,8 +286,8 @@ class LutrisScriptRunner(
                     val taskMap = taskData as? Map<*, *> ?: return@mapNotNull null
                     val taskDetails = taskMap["task"] as? Map<*, *> ?: return@mapNotNull null
                     
-                    LutrisTask(
-                        LutrisTaskDetails(
+                    ScriptableTask(
+                        ScriptableTaskDetails(
                             name = taskDetails["name"]?.toString() ?: return@mapNotNull null,
                             arch = taskDetails["arch"]?.toString(),
                             prefix = taskDetails["prefix"]?.toString(),
@@ -305,7 +305,7 @@ class LutrisScriptRunner(
                     val env = envData?.mapNotNull { (k, v) ->
                         k.toString() to v.toString()
                     }?.toMap()
-                    LutrisSystem(env)
+                    ScriptableSystem(env)
                 }
                 
                 val wineData = data["wine"] as? Map<*, *>
@@ -317,7 +317,7 @@ class LutrisScriptRunner(
                     LutrisWine(overrides)
                 }
                 
-                LutrisScript(files, game, installer, system, wine)
+                InstallScript(files, game, installer, system, wine)
             } catch (e: Exception) {
                 e.printStackTrace()
                 null
