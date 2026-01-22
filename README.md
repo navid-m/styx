@@ -2,7 +2,7 @@
 
 Game launcher for playing Windows games on Linux, intended as an alternative to Lutris.
 
-Screenshot:
+Screenshots:
 
 <img src=".github/screenshot.png">
 <img src=".github/screenshot2.png">
