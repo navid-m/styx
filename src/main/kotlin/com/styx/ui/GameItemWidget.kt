@@ -9,7 +9,11 @@ import java.awt.Component
 import java.awt.Desktop
 import java.awt.Dimension
 import java.awt.Font
+import java.awt.Graphics
+import java.awt.Graphics2D
 import java.awt.Image
+import java.awt.Insets
+import java.awt.RenderingHints
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
@@ -35,12 +39,30 @@ import javax.swing.JPopupMenu
 import javax.swing.JScrollPane
 import javax.swing.JTable
 import javax.swing.SwingUtilities
+import javax.swing.border.AbstractBorder
 import javax.swing.border.EmptyBorder
 import javax.swing.border.LineBorder
 import javax.swing.filechooser.FileNameExtensionFilter
 import javax.swing.table.DefaultTableCellRenderer
 import javax.swing.table.DefaultTableModel
 import kotlin.math.min
+
+class RoundedBorder(private val color: Color, private val thickness: Int, private val radius: Int) : AbstractBorder() {
+    override fun paintBorder(c: Component, g: Graphics, x: Int, y: Int, width: Int, height: Int) {
+        val g2 = g.create() as Graphics2D
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+        g2.color = color
+        g2.stroke = java.awt.BasicStroke(thickness.toFloat())
+        g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius)
+        g2.dispose()
+    }
+
+    override fun getBorderInsets(c: Component): Insets {
+        return Insets(thickness, thickness, thickness, thickness)
+    }
+
+    override fun isBorderOpaque(): Boolean = false
+}
 
 class GameItemWidget(
     private val game: Game,
@@ -65,7 +87,7 @@ class GameItemWidget(
     private fun initUI() {
         layout = BoxLayout(this, BoxLayout.X_AXIS)
         border = BorderFactory.createCompoundBorder(
-            LineBorder(Color(48, 47, 47), 1, true),
+            RoundedBorder(Color(48, 47, 47), 1, 15),
             EmptyBorder(5, 5, 5, 5)
         )
         background = Color(34, 35, 36)
@@ -74,9 +96,9 @@ class GameItemWidget(
         imageLabel.preferredSize = Dimension(60, 60)
         imageLabel.minimumSize = Dimension(60, 60)
         imageLabel.maximumSize = Dimension(60, 60)
-        imageLabel.border = BorderFactory.createEtchedBorder()
+        imageLabel.border = EmptyBorder(0, 0, 0, 0)
         add(imageLabel)
-        add(Box.createHorizontalStrut(5))
+        add(Box.createHorizontalStrut(12))
 
         val infoPanel = JPanel()
         infoPanel.layout = BoxLayout(infoPanel, BoxLayout.Y_AXIS)
@@ -156,7 +178,8 @@ class GameItemWidget(
                     val bufferedImage = ImageIO.read(imageFile)
                     if (bufferedImage != null) {
                         val scaledImage = bufferedImage.getScaledInstance(60, 60, Image.SCALE_SMOOTH)
-                        imageLabel.icon = ImageIcon(scaledImage)
+                        val roundedImage = createRoundedImage(scaledImage, 9)
+                        imageLabel.icon = ImageIcon(roundedImage)
                     } else {
                         println("ImageIO.read returned null for: ${imageFile.absolutePath}")
                         imageLabel.icon = createPlaceholderIcon()
@@ -185,6 +208,22 @@ class GameItemWidget(
         g2d.drawLine(60, 0, 0, 60)
         g2d.dispose()
         return ImageIcon(placeholder)
+    }
+
+    private fun createRoundedImage(image: Image, cornerRadius: Int): BufferedImage {
+        val width = 60
+        val height = 60
+        val output = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
+        val g2 = output.createGraphics()
+        
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+        g2.clip = java.awt.geom.RoundRectangle2D.Float(0f, 0f, width.toFloat(), height.toFloat(),
+            cornerRadius.toFloat(), cornerRadius.toFloat())
+        g2.drawImage(image, 0, 0, width, height, null)
+        g2.dispose()
+        
+        return output
     }
 
     private fun setupImageContextMenu() {
