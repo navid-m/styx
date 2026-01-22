@@ -480,7 +480,7 @@ class TroubleshootDialog(
                     DiagnosticResult(
                         "Disk Space",
                         DiagnosticStatus.WARNING,
-                        "${usableSpace} GB free on game drive",
+                        "$usableSpace GB free on game drive",
                         "Consider freeing up more space for optimal performance"
                     )
                 )
@@ -491,7 +491,7 @@ class TroubleshootDialog(
                     DiagnosticResult(
                         "Disk Space",
                         DiagnosticStatus.PASS,
-                        "${usableSpace} GB free on game drive",
+                        "$usableSpace GB free on game drive",
                         ""
                     )
                 )
