@@ -333,7 +333,7 @@ class GameConfigDialog(
 
             if (!game.steamAppId.isNullOrEmpty()) {
                 additionalActionsPanel.add(Box.createVerticalStrut(8))
-                val protonDbBtn = JButton("Open ProtonDB Page").apply {
+                val protonDbBtn = JButton("Open ProtonDB").apply {
                     maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
                     alignmentX = LEFT_ALIGNMENT
                     toolTipText = "Open this game's ProtonDB page"
