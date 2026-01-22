@@ -38,7 +38,7 @@ class TroubleshootDialog(
         val mainPanel = JPanel(BorderLayout())
         mainPanel.border = EmptyBorder(15, 15, 15, 15)
 
-        val titleLabel = JLabel("Game Troubleshooting")
+        val titleLabel = JLabel("Troubleshooting")
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 18f)
         titleLabel.border = EmptyBorder(0, 0, 15, 0)
 
