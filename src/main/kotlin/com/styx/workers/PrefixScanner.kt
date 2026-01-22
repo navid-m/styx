@@ -118,7 +118,6 @@ class PrefixScanner : SwingWorker<List<PrefixInfo>, Void>() {
         try {
             val steamappsPath = path.resolve("steamapps")
             if (steamappsPath.exists() && steamappsPath.isDirectory()) {
-                println("[SCAN] Found steamapps at: $path")
                 val compatdataPath = steamappsPath.resolve("compatdata")
                 if (compatdataPath.exists() && compatdataPath.isDirectory()) {
                     try {
