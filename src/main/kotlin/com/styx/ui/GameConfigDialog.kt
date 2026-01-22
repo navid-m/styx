@@ -53,22 +53,29 @@ class GameConfigDialog(
     }
 
     private fun initUI() {
-        minimumSize = Dimension(450, 950)
-        preferredSize = Dimension(450, 950)
-        val mainPanel = JPanel()
-        mainPanel.layout = BoxLayout(mainPanel, BoxLayout.Y_AXIS)
+        minimumSize = Dimension(750, 690)
+        preferredSize = Dimension(750, 690)
+        maximumSize = Dimension(780, 720)
+
+        val mainPanel = JPanel(BorderLayout(15, 15))
         mainPanel.border = EmptyBorder(15, 15, 15, 15)
 
         val titleLabel = JLabel("Game Configuration")
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
-        titleLabel.alignmentX = LEFT_ALIGNMENT
-        mainPanel.add(titleLabel)
-        mainPanel.add(Box.createVerticalStrut(15))
+        mainPanel.add(titleLabel, BorderLayout.NORTH)
+
+        val centerPanel = JPanel()
+        centerPanel.layout = BoxLayout(centerPanel, BoxLayout.X_AXIS)
+        
+        val leftPanel = JPanel()
+        leftPanel.layout = BoxLayout(leftPanel, BoxLayout.Y_AXIS)
+        leftPanel.alignmentX = LEFT_ALIGNMENT
 
         val loggingPanel = JPanel()
         loggingPanel.layout = BoxLayout(loggingPanel, BoxLayout.Y_AXIS)
         loggingPanel.border = BorderFactory.createTitledBorder("Wine Debug Level")
         loggingPanel.alignmentX = LEFT_ALIGNMENT
+        loggingPanel.maximumSize = Dimension(400, 120)
 
         val logLevelPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
         logLevelPanel.add(JLabel("Log Level:"))
@@ -93,13 +100,14 @@ class GameConfigDialog(
         loggingInfoLabel.alignmentX = LEFT_ALIGNMENT
         loggingPanel.add(loggingInfoLabel)
 
-        mainPanel.add(loggingPanel)
-        mainPanel.add(Box.createVerticalStrut(15))
+        leftPanel.add(loggingPanel)
+        leftPanel.add(Box.createVerticalStrut(15))
 
         val cpuGovernorPanel = JPanel()
         cpuGovernorPanel.layout = BoxLayout(cpuGovernorPanel, BoxLayout.Y_AXIS)
         cpuGovernorPanel.border = BorderFactory.createTitledBorder("CPU Governor")
         cpuGovernorPanel.alignmentX = LEFT_ALIGNMENT
+        cpuGovernorPanel.maximumSize = Dimension(400, 120)
 
         val governorPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
         governorPanel.add(JLabel("Governor:"))
@@ -121,13 +129,14 @@ class GameConfigDialog(
         governorInfoLabel.alignmentX = LEFT_ALIGNMENT
         cpuGovernorPanel.add(governorInfoLabel)
 
-        mainPanel.add(cpuGovernorPanel)
-        mainPanel.add(Box.createVerticalStrut(15))
+        leftPanel.add(cpuGovernorPanel)
+        leftPanel.add(Box.createVerticalStrut(15))
 
         val protonDbPanel = JPanel()
         protonDbPanel.layout = BoxLayout(protonDbPanel, BoxLayout.Y_AXIS)
         protonDbPanel.border = BorderFactory.createTitledBorder("ProtonDB Integration")
         protonDbPanel.alignmentX = LEFT_ALIGNMENT
+        protonDbPanel.maximumSize = Dimension(400, 120)
 
         val steamIdPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 5))
         steamIdPanel.add(JLabel("Steam App ID:"))
@@ -149,13 +158,14 @@ class GameConfigDialog(
         protonDbPanel.add(Box.createVerticalStrut(5))
         protonDbPanel.add(pdbInfoLabel)
 
-        mainPanel.add(protonDbPanel)
-        mainPanel.add(Box.createVerticalStrut(15))
+        leftPanel.add(protonDbPanel)
+        leftPanel.add(Box.createVerticalStrut(15))
 
         val actionsPanel = JPanel()
         actionsPanel.layout = BoxLayout(actionsPanel, BoxLayout.Y_AXIS)
         actionsPanel.border = BorderFactory.createTitledBorder("Configuration Actions")
         actionsPanel.alignmentX = LEFT_ALIGNMENT
+        actionsPanel.maximumSize = Dimension(400, 250)
 
         val paramsBtn = JButton("Launch Parameters...").apply {
             maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
@@ -200,8 +210,66 @@ class GameConfigDialog(
         }
 
         actionsPanel.add(changePrefixBtn)
-        mainPanel.add(actionsPanel)
-        mainPanel.add(Box.createVerticalStrut(15))
+        leftPanel.add(actionsPanel)
+        leftPanel.add(Box.createVerticalStrut(15))
+
+        val lutrisPanel = JPanel()
+        lutrisPanel.layout = BoxLayout(lutrisPanel, BoxLayout.Y_AXIS)
+        lutrisPanel.border = BorderFactory.createTitledBorder("Lutris Install Script")
+        lutrisPanel.alignmentX = LEFT_ALIGNMENT
+
+        val scriptLabel = JLabel(if (game.lutrisScriptPath != null) {
+            "<html><small>Script loaded: ${File(game.lutrisScriptPath!!).name}</small></html>"
+        } else {
+            "<html><small>No script loaded</small></html>"
+        })
+        scriptLabel.foreground = Color(0x88, 0x88, 0x88)
+        scriptLabel.alignmentX = LEFT_ALIGNMENT
+        lutrisPanel.add(scriptLabel)
+        lutrisPanel.add(Box.createVerticalStrut(5))
+
+        val scriptButtonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 0))
+        
+        val runScriptBtn = JButton("Run Script").apply {
+            preferredSize = Dimension(120, 28)
+            isEnabled = game.lutrisScriptPath != null
+        }
+        
+        val clearScriptBtn = JButton("Clear").apply {
+            preferredSize = Dimension(80, 28)
+            isEnabled = game.lutrisScriptPath != null
+        }
+        
+        val loadScriptBtn = JButton("Load Script...").apply {
+            preferredSize = Dimension(120, 28)
+            addActionListener {
+                loadLutrisScript(scriptLabel, runScriptBtn, clearScriptBtn)
+            }
+        }
+        scriptButtonPanel.add(loadScriptBtn)
+
+        runScriptBtn.addActionListener {
+            runLutrisScript()
+        }
+        scriptButtonPanel.add(runScriptBtn)
+
+        clearScriptBtn.addActionListener {
+            game.lutrisScriptPath = null
+            scriptLabel.text = "<html><small>No script loaded</small></html>"
+            runScriptBtn.isEnabled = false
+            clearScriptBtn.isEnabled = false
+        }
+        scriptButtonPanel.add(clearScriptBtn)
+
+        lutrisPanel.add(scriptButtonPanel)
+
+        leftPanel.add(lutrisPanel)
+        leftPanel.add(Box.createVerticalGlue())
+
+        val rightPanel = JPanel()
+        rightPanel.layout = BoxLayout(rightPanel, BoxLayout.Y_AXIS)
+        rightPanel.preferredSize = Dimension(320, 120)
+        rightPanel.alignmentX = LEFT_ALIGNMENT
 
         val additionalActionsPanel = JPanel()
         additionalActionsPanel.layout = BoxLayout(additionalActionsPanel, BoxLayout.Y_AXIS)
@@ -277,12 +345,14 @@ class GameConfigDialog(
             }
         }
 
-        mainPanel.add(additionalActionsPanel)
-        mainPanel.add(Box.createVerticalGlue())
+        rightPanel.add(additionalActionsPanel)
+        rightPanel.add(Box.createVerticalGlue())
+        centerPanel.add(leftPanel)
+        centerPanel.add(Box.createHorizontalStrut(15))
+        centerPanel.add(rightPanel)
+        mainPanel.add(centerPanel, BorderLayout.CENTER)
 
         val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 8, 0))
-        buttonPanel.alignmentX = LEFT_ALIGNMENT
-        buttonPanel.maximumSize = Dimension(Short.MAX_VALUE.toInt(), 40)
 
         val saveBtn = JButton("Save").apply {
             preferredSize = Dimension(80, 32)
@@ -310,8 +380,7 @@ class GameConfigDialog(
         buttonPanel.add(saveBtn)
         buttonPanel.add(cancelBtn)
 
-        mainPanel.add(Box.createVerticalStrut(10))
-        mainPanel.add(buttonPanel)
+        mainPanel.add(buttonPanel, BorderLayout.SOUTH)
 
         contentPane = mainPanel
         pack()
@@ -509,5 +578,167 @@ class GameConfigDialog(
                 )
             }
         }
+    }
+
+    private fun loadLutrisScript(statusLabel: JLabel, runBtn: JButton, clearBtn: JButton) {
+        val fileChooser = javax.swing.JFileChooser()
+        fileChooser.dialogTitle = "Select Lutris Install Script"
+        fileChooser.fileFilter = javax.swing.filechooser.FileNameExtensionFilter("YAML files", "yaml", "yml")
+        
+        if (fileChooser.showOpenDialog(this) == javax.swing.JFileChooser.APPROVE_OPTION) {
+            val selectedFile = fileChooser.selectedFile
+            game.lutrisScriptPath = selectedFile.absolutePath
+            statusLabel.text = "<html><small>Script loaded: ${selectedFile.name}</small></html>"
+            runBtn.isEnabled = true
+            clearBtn.isEnabled = true
+            
+            JOptionPane.showMessageDialog(
+                this,
+                "Lutris script loaded successfully.\nUse 'Run Script' to execute it.",
+                "Success",
+                JOptionPane.INFORMATION_MESSAGE
+            )
+        }
+    }
+
+    private fun runLutrisScript() {
+        val scriptPath = game.lutrisScriptPath ?: return
+        
+        val scriptFile = File(scriptPath)
+        if (!scriptFile.exists()) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Script file not found: $scriptPath",
+                "Error",
+                JOptionPane.ERROR_MESSAGE
+            )
+            return
+        }
+
+        val result = JOptionPane.showConfirmDialog(
+            this,
+            "This will execute the Lutris install script.\n\n" +
+                "The script may:\n" +
+                "- Download files\n" +
+                "- Create/modify Wine prefix\n" +
+                "- Install dependencies via winetricks\n" +
+                "- Run installers\n\n" +
+                "Continue?",
+            "Run Lutris Script",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        )
+
+        if (result != JOptionPane.YES_OPTION) return
+
+        val outputWindow = com.styx.ui.GameOutputWindow(
+            gameName = "${game.name} - Lutris Script",
+            parent = launcher,
+            onAbort = {},
+            prefixPath = game.prefix,
+            useProton = false,
+            verboseLogging = true,
+            wineLogLevel = "+all"
+        )
+        outputWindow.isVisible = true
+
+        Thread {
+            try {
+                val yamlContent = scriptFile.readText()
+                val lutrisScript = com.styx.workers.LutrisScriptRunner.parseYaml(yamlContent)
+
+                if (lutrisScript == null) {
+                    SwingUtilities.invokeLater {
+                        outputWindow.appendOutput("ERROR: Failed to parse Lutris script", "#cc0000")
+                        JOptionPane.showMessageDialog(
+                            this,
+                            "Failed to parse Lutris script. Check YAML syntax.",
+                            "Parse Error",
+                            JOptionPane.ERROR_MESSAGE
+                        )
+                    }
+                    return@Thread
+                }
+
+                val gameDir = File(game.prefix).parentFile?.absolutePath ?: game.prefix
+                val runner = com.styx.workers.LutrisScriptRunner(
+                    lutrisScript,
+                    gameDir
+                ) { message, color ->
+                    SwingUtilities.invokeLater {
+                        outputWindow.appendOutput(message, color)
+                    }
+                }
+
+                val success = runner.executeInstaller()
+
+                SwingUtilities.invokeLater {
+                    if (success) {
+                        lutrisScript.game?.let { gameConfig ->
+                            gameConfig.exe?.let { exe ->
+                                val resolvedExe = exe.replace("\$GAMEDIR", gameDir)
+                                val exePath = File(gameDir, resolvedExe)
+                                if (exePath.exists()) {
+                                    game.executable = exePath.absolutePath
+                                    outputWindow.appendOutput("", null)
+                                    outputWindow.appendOutput("Updated game executable: ${game.executable}", "#0066cc")
+                                }
+                            }
+                            
+                            gameConfig.prefix?.let { prefix ->
+                                val resolvedPrefix = prefix.replace("\$GAMEDIR", gameDir)
+                                game.prefix = resolvedPrefix
+                                outputWindow.appendOutput("Updated game prefix: ${game.prefix}", "#0066cc")
+                            }
+                        }
+
+                        lutrisScript.system?.env?.let { env ->
+                            outputWindow.appendOutput("", null)
+                            outputWindow.appendOutput("Applying environment variables from script...", "#0066cc")
+                            env.forEach { (key, value) ->
+                                game.launchOptions[key] = value.replace("\$GAMEDIR", gameDir)
+                                outputWindow.appendOutput("  $key=$value", null)
+                            }
+                        }
+
+                        lutrisScript.wine?.overrides?.let { overrides ->
+                            outputWindow.appendOutput("", null)
+                            outputWindow.appendOutput("Wine DLL overrides from script:", "#0066cc")
+                            val overrideString = overrides.entries.joinToString(";") { "${it.key}=${it.value}" }
+                            game.launchOptions["WINEDLLOVERRIDES"] = overrideString
+                            outputWindow.appendOutput("  WINEDLLOVERRIDES=$overrideString", null)
+                        }
+
+                        outputWindow.appendOutput("", null)
+                        outputWindow.appendOutput("Note: Game configuration has been updated. Make sure to save your changes.", "#00aa00")
+
+                        JOptionPane.showMessageDialog(
+                            this,
+                            "Lutris script executed successfully!\n\nGame configuration has been updated from the script.",
+                            "Success",
+                            JOptionPane.INFORMATION_MESSAGE
+                        )
+                    } else {
+                        JOptionPane.showMessageDialog(
+                            this,
+                            "Lutris script execution failed. Check the output window for details.",
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                SwingUtilities.invokeLater {
+                    outputWindow.appendOutput("FATAL ERROR: ${e.message}", "#cc0000")
+                    JOptionPane.showMessageDialog(
+                        this,
+                        "Error executing Lutris script: ${e.message}",
+                        "Error",
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
+            }
+        }.start()
     }
 }

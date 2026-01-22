@@ -5,7 +5,7 @@ package com.styx.models
  */
 data class Game(
     var name: String,
-    val executable: String,
+    var executable: String,
     var prefix: String,
     var protonVersion: String? = null,
     var protonPath: String? = null,
@@ -21,7 +21,8 @@ data class Game(
     var wineLogLevel: String = "warn+all,fixme-all",
     var category: String = "All",
     var steamAppId: String? = null,
-    var cpuGovernor: String? = null
+    var cpuGovernor: String? = null,
+    var lutrisScriptPath: String? = null
 ) {
     /**
      * Helper to get game type.
