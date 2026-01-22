@@ -255,18 +255,51 @@ class TroubleshootDialog(
                             )
                         }
 
-                        fsType.contains("fuseblk", ignoreCase = true) || fsType.contains(
-                            "fuseblk",
-                            ignoreCase = true
-                        ) -> {
-                            addResult(
-                                DiagnosticResult(
-                                    "Filesystem Type",
-                                    DiagnosticStatus.ERROR,
-                                    "Game is on fuseblk filesystem",
-                                    "If the underlying filesystem is NTFS, this WILL cause casing issues which will make the game fail to start"
+                        fsType.contains("fuseblk", ignoreCase = true) -> {
+                            val isNtfs = try {
+                                val device = parts[0]
+                                val blkidProcess = ProcessBuilder("blkid", "-o", "value", "-s", "TYPE", device).start()
+                                val blkidReader = BufferedReader(InputStreamReader(blkidProcess.inputStream))
+                                val actualFsType = blkidReader.readLine()?.trim() ?: ""
+                                blkidProcess.waitFor()
+                                actualFsType.contains("ntfs", ignoreCase = true)
+                            } catch (e: Exception) {
+                                try {
+                                    val mountsFile = File("/proc/mounts")
+                                    mountsFile.readLines().any { line ->
+                                        val mountParts = line.split(Regex("\\s+"))
+                                        if (mountParts.size >= 3) {
+                                            val mountPoint = mountParts[1]
+                                            val mountFsType = mountParts[2]
+                                            gamePath.startsWith(mountPoint) &&
+                                                    (mountFsType.contains("ntfs", ignoreCase = true) ||
+                                                            line.contains("ntfs", ignoreCase = true))
+                                        } else false
+                                    }
+                                } catch (e2: Exception) {
+                                    false
+                                }
+                            }
+
+                            if (isNtfs) {
+                                addResult(
+                                    DiagnosticResult(
+                                        "Filesystem Type",
+                                        DiagnosticStatus.ERROR,
+                                        "Game is on NTFS filesystem (fuseblk)",
+                                        "NTFS can cause casing issues which WILL make the game fail to start. Move game to ext4/btrfs/xfs"
+                                    )
                                 )
-                            )
+                            } else {
+                                addResult(
+                                    DiagnosticResult(
+                                        "Filesystem Type",
+                                        DiagnosticStatus.PASS,
+                                        "Game is on fuseblk filesystem (non-NTFS)",
+                                        ""
+                                    )
+                                )
+                            }
                         }
 
                         else -> {
@@ -721,7 +754,7 @@ class TroubleshootDialog(
                 }
             }
         } catch (e: Exception) {
-            // Fallback
+            // Fallback.
         }
 
         addResult(
@@ -769,7 +802,7 @@ class TroubleshootDialog(
                 }
             }
         } catch (e: Exception) {
-            // Ignore
+            // Ignore.
         }
 
         addResult(
