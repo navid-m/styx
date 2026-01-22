@@ -22,6 +22,7 @@ import javax.swing.JLabel
 import javax.swing.JOptionPane
 import javax.swing.JPanel
 import javax.swing.JTextField
+import javax.swing.SwingConstants
 import javax.swing.SwingUtilities
 import javax.swing.border.EmptyBorder
 
@@ -66,7 +67,7 @@ class GameConfigDialog(
 
         val centerPanel = JPanel()
         centerPanel.layout = BoxLayout(centerPanel, BoxLayout.X_AXIS)
-        
+
         val leftPanel = JPanel()
         leftPanel.layout = BoxLayout(leftPanel, BoxLayout.Y_AXIS)
         leftPanel.alignmentX = LEFT_ALIGNMENT
@@ -213,33 +214,33 @@ class GameConfigDialog(
         leftPanel.add(actionsPanel)
         leftPanel.add(Box.createVerticalStrut(15))
 
-        val lutrisPanel = JPanel()
-        lutrisPanel.layout = BoxLayout(lutrisPanel, BoxLayout.Y_AXIS)
-        lutrisPanel.border = BorderFactory.createTitledBorder("Lutris Install Script")
+        val lutrisPanel = JPanel(BorderLayout(5, 5))
+        lutrisPanel.border = BorderFactory.createTitledBorder("Install Script")
         lutrisPanel.alignmentX = LEFT_ALIGNMENT
-
-        val scriptLabel = JLabel(if (game.lutrisScriptPath != null) {
-            "<html><small>Script loaded: ${File(game.lutrisScriptPath!!).name}</small></html>"
-        } else {
-            "<html><small>No script loaded</small></html>"
-        })
-        scriptLabel.foreground = Color(0x88, 0x88, 0x88)
-        scriptLabel.alignmentX = LEFT_ALIGNMENT
-        lutrisPanel.add(scriptLabel)
-        lutrisPanel.add(Box.createVerticalStrut(5))
+        lutrisPanel.maximumSize = Dimension(400, 90)
 
         val scriptButtonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 5, 0))
-        
+
         val runScriptBtn = JButton("Run Script").apply {
             preferredSize = Dimension(120, 28)
             isEnabled = game.lutrisScriptPath != null
         }
-        
+
         val clearScriptBtn = JButton("Clear").apply {
             preferredSize = Dimension(80, 28)
             isEnabled = game.lutrisScriptPath != null
         }
-        
+
+        val scriptLabel = JLabel(
+            if (game.lutrisScriptPath != null) {
+                "<html><small>Script loaded: ${File(game.lutrisScriptPath!!).name}</small></html>"
+            } else {
+                "<html><small>No script loaded</small></html>"
+            }
+        )
+        scriptLabel.foreground = Color(0x88, 0x88, 0x88)
+        scriptLabel.horizontalAlignment = SwingConstants.RIGHT
+
         val loadScriptBtn = JButton("Load Script...").apply {
             preferredSize = Dimension(120, 28)
             addActionListener {
@@ -261,7 +262,8 @@ class GameConfigDialog(
         }
         scriptButtonPanel.add(clearScriptBtn)
 
-        lutrisPanel.add(scriptButtonPanel)
+        lutrisPanel.add(scriptButtonPanel, BorderLayout.NORTH)
+        lutrisPanel.add(scriptLabel, BorderLayout.SOUTH)
 
         leftPanel.add(lutrisPanel)
         leftPanel.add(Box.createVerticalGlue())
@@ -582,19 +584,19 @@ class GameConfigDialog(
 
     private fun loadLutrisScript(statusLabel: JLabel, runBtn: JButton, clearBtn: JButton) {
         val fileChooser = javax.swing.JFileChooser()
-        fileChooser.dialogTitle = "Select Lutris Install Script"
+        fileChooser.dialogTitle = "Select Install Script"
         fileChooser.fileFilter = javax.swing.filechooser.FileNameExtensionFilter("YAML files", "yaml", "yml")
-        
+
         if (fileChooser.showOpenDialog(this) == javax.swing.JFileChooser.APPROVE_OPTION) {
             val selectedFile = fileChooser.selectedFile
             game.lutrisScriptPath = selectedFile.absolutePath
             statusLabel.text = "<html><small>Script loaded: ${selectedFile.name}</small></html>"
             runBtn.isEnabled = true
             clearBtn.isEnabled = true
-            
+
             JOptionPane.showMessageDialog(
                 this,
-                "Lutris script loaded successfully.\nUse 'Run Script' to execute it.",
+                "Script loaded successfully.\nUse 'Run Script' to execute it.",
                 "Success",
                 JOptionPane.INFORMATION_MESSAGE
             )
@@ -603,7 +605,7 @@ class GameConfigDialog(
 
     private fun runLutrisScript() {
         val scriptPath = game.lutrisScriptPath ?: return
-        
+
         val scriptFile = File(scriptPath)
         if (!scriptFile.exists()) {
             JOptionPane.showMessageDialog(
@@ -617,14 +619,14 @@ class GameConfigDialog(
 
         val result = JOptionPane.showConfirmDialog(
             this,
-            "This will execute the Lutris install script.\n\n" +
-                "The script may:\n" +
-                "- Download files\n" +
-                "- Create/modify Wine prefix\n" +
-                "- Install dependencies via winetricks\n" +
-                "- Run installers\n\n" +
-                "Continue?",
-            "Run Lutris Script",
+            "This will execute the install script.\n\n" +
+                    "The script may:\n" +
+                    "- Download files\n" +
+                    "- Create/modify Wine prefix\n" +
+                    "- Install dependencies via winetricks\n" +
+                    "- Run installers\n\n" +
+                    "Continue?",
+            "Run Script",
             JOptionPane.YES_NO_OPTION,
             JOptionPane.WARNING_MESSAGE
         )
@@ -632,7 +634,7 @@ class GameConfigDialog(
         if (result != JOptionPane.YES_OPTION) return
 
         val outputWindow = com.styx.ui.GameOutputWindow(
-            gameName = "${game.name} - Lutris Script",
+            gameName = "${game.name} - Install Script",
             parent = launcher,
             onAbort = {},
             prefixPath = game.prefix,
@@ -649,10 +651,10 @@ class GameConfigDialog(
 
                 if (lutrisScript == null) {
                     SwingUtilities.invokeLater {
-                        outputWindow.appendOutput("ERROR: Failed to parse Lutris script", "#cc0000")
+                        outputWindow.appendOutput("ERROR: Failed to parse script", "#cc0000")
                         JOptionPane.showMessageDialog(
                             this,
-                            "Failed to parse Lutris script. Check YAML syntax.",
+                            "Failed to parse script. Check YAML syntax.",
                             "Parse Error",
                             JOptionPane.ERROR_MESSAGE
                         )
@@ -684,7 +686,7 @@ class GameConfigDialog(
                                     outputWindow.appendOutput("Updated game executable: ${game.executable}", "#0066cc")
                                 }
                             }
-                            
+
                             gameConfig.prefix?.let { prefix ->
                                 val resolvedPrefix = prefix.replace("\$GAMEDIR", gameDir)
                                 game.prefix = resolvedPrefix
@@ -710,18 +712,21 @@ class GameConfigDialog(
                         }
 
                         outputWindow.appendOutput("", null)
-                        outputWindow.appendOutput("Note: Game configuration has been updated. Make sure to save your changes.", "#00aa00")
+                        outputWindow.appendOutput(
+                            "Note: Game configuration has been updated. Make sure to save your changes.",
+                            "#00aa00"
+                        )
 
                         JOptionPane.showMessageDialog(
                             this,
-                            "Lutris script executed successfully!\n\nGame configuration has been updated from the script.",
+                            "Script executed successfully.\n\nGame configuration has been updated from the script.",
                             "Success",
                             JOptionPane.INFORMATION_MESSAGE
                         )
                     } else {
                         JOptionPane.showMessageDialog(
                             this,
-                            "Lutris script execution failed. Check the output window for details.",
+                            "Script execution failed. Check the output window for details.",
                             "Error",
                             JOptionPane.ERROR_MESSAGE
                         )
@@ -733,7 +738,7 @@ class GameConfigDialog(
                     outputWindow.appendOutput("FATAL ERROR: ${e.message}", "#cc0000")
                     JOptionPane.showMessageDialog(
                         this,
-                        "Error executing Lutris script: ${e.message}",
+                        "Error executing script: ${e.message}",
                         "Error",
                         JOptionPane.ERROR_MESSAGE
                     )

@@ -15,7 +15,7 @@ class LutrisScriptRunner(
     private val downloadedFiles = mutableMapOf<String, String>()
     
     fun executeInstaller(): Boolean {
-        outputCallback("=== Starting Lutris Script Execution ===", "#0066cc")
+        outputCallback("=== Starting Script Execution ===", "#0066cc")
         outputCallback("Game Directory: $gameDir", null)
         outputCallback("", null)
         
