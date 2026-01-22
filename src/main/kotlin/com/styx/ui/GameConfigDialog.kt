@@ -647,7 +647,7 @@ class GameConfigDialog(
         Thread {
             try {
                 val yamlContent = scriptFile.readText()
-                val lutrisScript = com.styx.workers.LutrisScriptRunner.parseYaml(yamlContent)
+                val lutrisScript = com.styx.workers.ScriptRunner.parseYaml(yamlContent)
 
                 if (lutrisScript == null) {
                     SwingUtilities.invokeLater {
@@ -663,7 +663,7 @@ class GameConfigDialog(
                 }
 
                 val gameDir = File(game.prefix).parentFile?.absolutePath ?: game.prefix
-                val runner = com.styx.workers.LutrisScriptRunner(
+                val runner = com.styx.workers.ScriptRunner(
                     lutrisScript,
                     gameDir
                 ) { message, color ->

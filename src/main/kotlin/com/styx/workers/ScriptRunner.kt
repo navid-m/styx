@@ -7,7 +7,7 @@ import java.net.URL
 import java.nio.file.Files
 import javax.swing.SwingUtilities
 
-class LutrisScriptRunner(
+class ScriptRunner(
     private val script: InstallScript,
     private val gameDir: String,
     private val outputCallback: (String, String?) -> Unit
