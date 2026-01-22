@@ -18,6 +18,10 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
         override fun isCellEditable(row: Int, column: Int) = true
     }
     private val flagsTable = JTable(flagsTableModel)
+    private val singletonFlagsTableModel = object : DefaultTableModel(arrayOf("Flag"), 0) {
+        override fun isCellEditable(row: Int, column: Int) = true
+    }
+    private val singletonFlagsTable = JTable(singletonFlagsTableModel)
     
     private var currentSettings = GlobalSettings()
 
@@ -28,13 +32,14 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
             parent.globalSettings.theme.metadataLabelColor
         )
         currentSettings.globalFlags = parent.globalSettings.globalFlags.toMutableMap()
+        currentSettings.globalSingletonFlags = parent.globalSettings.globalSingletonFlags.toMutableList()
         
         initUI()
     }
 
     private fun initUI() {
-        minimumSize = Dimension(600, 550)
-        preferredSize = Dimension(600, 550)
+        minimumSize = Dimension(600, 770)
+        preferredSize = Dimension(600, 770)
         
         val mainPanel = JPanel(BorderLayout(10, 10))
         mainPanel.border = EmptyBorder(15, 15, 15, 15)
@@ -45,6 +50,8 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
         contentPanel.add(createThemeSection())
         contentPanel.add(Box.createVerticalStrut(20))
         contentPanel.add(createGlobalFlagsSection())
+        contentPanel.add(Box.createVerticalStrut(15))
+        contentPanel.add(createGlobalSingletonFlagsSection())
         
         mainPanel.add(JScrollPane(contentPanel), BorderLayout.CENTER)
         mainPanel.add(createButtonPanel(), BorderLayout.SOUTH)
@@ -114,10 +121,10 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
 
     private fun createGlobalFlagsSection(): JPanel {
         val panel = JPanel(BorderLayout(5, 5))
-        panel.border = TitledBorder("Global Flags")
+        panel.border = TitledBorder("Global Environment Variables (KEY=VALUE)")
         panel.alignmentX = Component.LEFT_ALIGNMENT
         
-        val infoLabel = JLabel("<html>These flags are applied to ALL games.<br>Per-game flags override global flags.</html>")
+        val infoLabel = JLabel("<html>These environment variables are applied to ALL games.<br>Per-game flags override global flags.</html>")
         infoLabel.border = EmptyBorder(5, 5, 10, 5)
         panel.add(infoLabel, BorderLayout.NORTH)
         
@@ -129,7 +136,7 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
         }
         
         val scrollPane = JScrollPane(flagsTable)
-        scrollPane.preferredSize = Dimension(500, 150)
+        scrollPane.preferredSize = Dimension(500, 120)
         
         val tablePanel = JPanel(BorderLayout())
         tablePanel.add(scrollPane, BorderLayout.CENTER)
@@ -150,6 +157,55 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
                 val selectedRow = flagsTable.selectedRow
                 if (selectedRow >= 0) {
                     flagsTableModel.removeRow(selectedRow)
+                }
+            }
+        }
+        buttonPanel.add(removeRowBtn)
+        
+        tablePanel.add(buttonPanel, BorderLayout.SOUTH)
+        panel.add(tablePanel, BorderLayout.CENTER)
+        
+        return panel
+    }
+    
+    private fun createGlobalSingletonFlagsSection(): JPanel {
+        val panel = JPanel(BorderLayout(5, 5))
+        panel.border = TitledBorder("Global Standalone Flags")
+        panel.alignmentX = Component.LEFT_ALIGNMENT
+        
+        val infoLabel = JLabel("<html>These standalone flags (e.g., -d3d9) are applied to ALL games.<br>Per-game flags are appended after global flags.</html>")
+        infoLabel.border = EmptyBorder(5, 5, 10, 5)
+        panel.add(infoLabel, BorderLayout.NORTH)
+        
+        singletonFlagsTable.fillsViewportHeight = true
+        singletonFlagsTable.rowHeight = 25
+        
+        currentSettings.globalSingletonFlags.forEach { flag ->
+            singletonFlagsTableModel.addRow(arrayOf(flag))
+        }
+        
+        val scrollPane = JScrollPane(singletonFlagsTable)
+        scrollPane.preferredSize = Dimension(500, 120)
+        
+        val tablePanel = JPanel(BorderLayout())
+        tablePanel.add(scrollPane, BorderLayout.CENTER)
+        
+        val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 5, 5))
+        
+        val addRowBtn = JButton("Add").apply {
+            preferredSize = Dimension(80, 28)
+            addActionListener {
+                singletonFlagsTableModel.addRow(arrayOf(""))
+            }
+        }
+        buttonPanel.add(addRowBtn)
+        
+        val removeRowBtn = JButton("Remove").apply {
+            preferredSize = Dimension(80, 28)
+            addActionListener {
+                val selectedRow = singletonFlagsTable.selectedRow
+                if (selectedRow >= 0) {
+                    singletonFlagsTableModel.removeRow(selectedRow)
                 }
             }
         }
@@ -198,6 +254,16 @@ class SettingsDialog(private val parent: GameLauncher) : JDialog(parent, "Settin
             }
             
             currentSettings.globalFlags = flags
+            
+            val singletonFlags = mutableListOf<String>()
+            for (i in 0 until singletonFlagsTableModel.rowCount) {
+                val flag = (singletonFlagsTableModel.getValueAt(i, 0) as? String)?.trim() ?: ""
+                if (flag.isNotEmpty()) {
+                    singletonFlags.add(flag)
+                }
+            }
+            
+            currentSettings.globalSingletonFlags = singletonFlags
             
             parent.globalSettings = currentSettings
             parent.saveSettings()

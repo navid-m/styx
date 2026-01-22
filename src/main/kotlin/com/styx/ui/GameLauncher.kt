@@ -1510,24 +1510,32 @@ class GameLauncher : JFrame("Styx") {
             if (useProton) {
                 val protonBin = game.protonBin!!
                 val commandList = mutableListOf(protonBin, "run", File(exePath).absolutePath)
+                globalSettings.globalSingletonFlags.let { commandList.addAll(it) }
                 game.singletonFlags?.let { commandList.addAll(it) }
                 processBuilder.command(commandList)
 
                 outputWindow.appendOutput("=== Starting Proton Process ===", "#0066cc")
                 outputWindow.appendOutput("Command: ${commandList.joinToString(" ")}")
+                if (globalSettings.globalSingletonFlags.isNotEmpty()) {
+                    outputWindow.appendOutput("Global standalone flags: ${globalSettings.globalSingletonFlags.joinToString(" ")}", "#0088cc")
+                }
                 if (!game.singletonFlags.isNullOrEmpty()) {
-                    outputWindow.appendOutput("Standalone flags: ${(game.singletonFlags as Iterable<Any?>).joinToString(" ")}", "#00aa00")
+                    outputWindow.appendOutput("Game standalone flags: ${(game.singletonFlags as Iterable<Any?>).joinToString(" ")}", "#00aa00")
                 }
                 outputWindow.appendOutput("")
             } else {
                 val commandList = mutableListOf("wine", File(exePath).absolutePath)
+                globalSettings.globalSingletonFlags.let { commandList.addAll(it) }
                 game.singletonFlags?.let { commandList.addAll(it) }
                 processBuilder.command(commandList)
 
                 outputWindow.appendOutput("=== Starting Wine Process ===", "#0066cc")
                 outputWindow.appendOutput("Command: ${commandList.joinToString(" ")}")
+                if (globalSettings.globalSingletonFlags.isNotEmpty()) {
+                    outputWindow.appendOutput("Global standalone flags: ${globalSettings.globalSingletonFlags.joinToString(" ")}", "#0088cc")
+                }
                 if (!game.singletonFlags.isNullOrEmpty()) {
-                    outputWindow.appendOutput("Standalone flags: ${(game.singletonFlags as Iterable<Any?>).joinToString(" ")}", "#00aa00")
+                    outputWindow.appendOutput("Game standalone flags: ${(game.singletonFlags as Iterable<Any?>).joinToString(" ")}", "#00aa00")
                 }
                 outputWindow.appendOutput("")
             }

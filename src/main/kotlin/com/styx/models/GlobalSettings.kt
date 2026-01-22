@@ -5,5 +5,6 @@ package com.styx.models
  */
 data class GlobalSettings(
     var theme: Theme = Theme(),
-    var globalFlags: MutableMap<String, String> = mutableMapOf()
+    var globalFlags: MutableMap<String, String> = mutableMapOf(),
+    var globalSingletonFlags: MutableList<String> = mutableListOf()
 )
