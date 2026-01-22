@@ -304,10 +304,10 @@ class GameOutputWindow(
 
                 appendOutput("")
                 if (exitCode == 0) {
-                    appendOutput("✓ Wineserver killed successfully", "#008800")
+                    appendOutput("Wineserver killed successfully", "#008800")
                     appendOutput("You can now launch the game", "#008800")
                 } else {
-                    appendOutput("⚠ Wineserver command exited with code: $exitCode", "#cc6600")
+                    appendOutput("Wineserver command exited with code: $exitCode", "#cc6600")
                     appendOutput("This may be normal if no wineserver was running", "#cc6600")
                 }
                 appendOutput("═".repeat(60), "#0066cc")
