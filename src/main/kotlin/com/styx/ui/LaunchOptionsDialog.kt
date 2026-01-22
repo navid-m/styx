@@ -21,7 +21,6 @@ class LaunchOptionsDialog(
     private val game: Game,
     parent: JFrame
 ) : JDialog(parent, "Launch Options - ${game.name}", true) {
-
     private val tableModel = DefaultTableModel(arrayOf("Variable", "Value"), 0)
     private val table = JTable(tableModel)
     private val flagsTableModel = DefaultTableModel(arrayOf("Flag"), 0)
