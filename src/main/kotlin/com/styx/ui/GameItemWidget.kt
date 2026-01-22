@@ -229,6 +229,12 @@ class GameItemWidget(
             }
         }
 
+        val troubleshootItem = JMenuItem("Troubleshoot").apply {
+            addActionListener {
+                showTroubleshootDialog()
+            }
+        }
+
         val renameItem = JMenuItem("Rename").apply {
             addActionListener {
                 renameGame()
@@ -242,6 +248,7 @@ class GameItemWidget(
         }
 
         popupMenu.add(statsItem)
+        popupMenu.add(troubleshootItem)
         popupMenu.add(renameItem)
         popupMenu.addSeparator()
         popupMenu.add(openGameLocationItem)
@@ -444,6 +451,14 @@ class GameItemWidget(
             null -> {
 
             }
+        }
+    }
+
+    private fun showTroubleshootDialog() {
+        val parent = SwingUtilities.getWindowAncestor(this) as? JFrame
+        if (parent != null) {
+            val troubleshootDialog = TroubleshootDialog(game, parent)
+            troubleshootDialog.isVisible = true
         }
     }
 

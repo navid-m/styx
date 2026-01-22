@@ -178,6 +178,17 @@ class GameConfigDialog(
         additionalActionsPanel.border = BorderFactory.createTitledBorder("Quick Actions")
         additionalActionsPanel.alignmentX = LEFT_ALIGNMENT
 
+        val troubleshootBtn = JButton("Troubleshoot Game").apply {
+            maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
+            alignmentX = LEFT_ALIGNMENT
+            toolTipText = "Diagnose potential issues causing crashes or poor performance"
+            addActionListener {
+                showTroubleshootDialog()
+            }
+        }
+        additionalActionsPanel.add(troubleshootBtn)
+        additionalActionsPanel.add(Box.createVerticalStrut(8))
+
         val statsBtn = JButton("Show Statistics").apply {
             maximumSize = Dimension(Short.MAX_VALUE.toInt(), 32)
             alignmentX = LEFT_ALIGNMENT
@@ -316,6 +327,11 @@ class GameConfigDialog(
         }.start()
 
         progressDialog.isVisible = true
+    }
+
+    private fun showTroubleshootDialog() {
+        val troubleshootDialog = TroubleshootDialog(game, launcher)
+        troubleshootDialog.isVisible = true
     }
 
     private fun showStatistics() {
