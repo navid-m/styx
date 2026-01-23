@@ -1285,7 +1285,6 @@ class GameLauncher : JFrame("Styx") {
         outputWindow.appendOutput("LAUNCHING STEAM GAME: $gameName", "#0066cc")
         outputWindow.appendOutput("═".repeat(60), "#0066cc")
         outputWindow.appendOutput("")
-
         outputWindow.appendOutput("=== Launch Configuration ===", "#0066cc")
         outputWindow.appendOutput("Steam App ID: $steamAppId")
         outputWindow.appendOutput("Type: Steam Game", "#00aa00")
