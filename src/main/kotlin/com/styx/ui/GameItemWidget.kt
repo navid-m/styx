@@ -136,6 +136,11 @@ class GameItemWidget(
                 foreground = Color(0, 255, 0)
                 font = font.deriveFont(Font.BOLD, 11f)
             }
+        } else if (game.getGameType() == GameType.STEAM) {
+            JLabel("Steam ID: ${game.steamAppId ?: game.executable}").apply {
+                foreground = launcher.globalSettings.theme.getTimePlayedColorObject()
+                font = font.deriveFont(11f)
+            }
         } else {
             JLabel(formatTimePlayed(game.timePlayed)).apply {
                 foreground = launcher.globalSettings.theme.getTimePlayedColorObject()
