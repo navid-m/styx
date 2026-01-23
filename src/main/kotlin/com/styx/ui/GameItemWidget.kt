@@ -178,8 +178,8 @@ class GameItemWidget(
                 try {
                     val bufferedImage = ImageIO.read(imageFile)
                     if (bufferedImage != null) {
-                        val scaledImage = bufferedImage.getScaledInstance(60, 60, Image.SCALE_SMOOTH)
-                        val roundedImage = createRoundedImage(scaledImage, 9)
+                        val croppedImage = cropAndScaleImage(bufferedImage, 60, 60)
+                        val roundedImage = createRoundedImage(croppedImage, 9)
                         imageLabel.icon = ImageIcon(roundedImage)
                     } else {
                         println("ImageIO.read returned null for: ${imageFile.absolutePath}")
@@ -211,19 +211,57 @@ class GameItemWidget(
         return ImageIcon(placeholder)
     }
 
-    private fun createRoundedImage(image: Image, cornerRadius: Int): BufferedImage {
-        val width = 60
-        val height = 60
+    private fun cropAndScaleImage(image: BufferedImage, targetWidth: Int, targetHeight: Int): BufferedImage {
+        val sourceWidth = image.width
+        val sourceHeight = image.height
+        val sourceAspect = sourceWidth.toDouble() / sourceHeight.toDouble()
+        val targetAspect = targetWidth.toDouble() / targetHeight.toDouble()
+
+        val cropWidth: Int
+        val cropHeight: Int
+        val cropX: Int
+        val cropY: Int
+
+        if (sourceAspect > targetAspect) {
+            cropHeight = sourceHeight
+            cropWidth = (sourceHeight * targetAspect).toInt()
+            cropX = (sourceWidth - cropWidth) / 2
+            cropY = 0
+        } else {
+            cropWidth = sourceWidth
+            cropHeight = (sourceWidth / targetAspect).toInt()
+            cropX = 0
+            cropY = (sourceHeight - cropHeight) / 2
+        }
+
+        val croppedImage = image.getSubimage(cropX, cropY, cropWidth, cropHeight)
+        val scaledImage = BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_ARGB)
+        val g2d = scaledImage.createGraphics()
+
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+        g2d.drawImage(croppedImage, 0, 0, targetWidth, targetHeight, null)
+        g2d.dispose()
+
+        return scaledImage
+    }
+
+    private fun createRoundedImage(image: BufferedImage, cornerRadius: Int): BufferedImage {
+        val width = image.width
+        val height = image.height
         val output = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
         val g2 = output.createGraphics()
-        
+
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
-        g2.clip = java.awt.geom.RoundRectangle2D.Float(0f, 0f, width.toFloat(), height.toFloat(),
-            cornerRadius.toFloat(), cornerRadius.toFloat())
+        g2.clip = java.awt.geom.RoundRectangle2D.Float(
+            0f, 0f, width.toFloat(), height.toFloat(),
+            cornerRadius.toFloat(), cornerRadius.toFloat()
+        )
         g2.drawImage(image, 0, 0, width, height, null)
         g2.dispose()
-        
+
         return output
     }
 
