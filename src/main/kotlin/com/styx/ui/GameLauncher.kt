@@ -227,6 +227,7 @@ class GameLauncher : JFrame("Styx") {
                 isReorderingMode = isSelected
                 refreshGamesList()
             }
+            accelerator = KeyStroke.getKeyStroke("control I")
         }
         toolsMenu.add(reorderingModeItem)
         toolsMenu.addSeparator()
