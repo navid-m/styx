@@ -49,10 +49,24 @@ class GameItemWidget(
     private val onSaveGames: () -> Unit,
     private val isGamePlaying: (Game) -> Boolean,
     private val onRename: (Game) -> Unit,
-    private val onConfigure: (Game) -> Unit
+    private val onConfigure: (Game) -> Unit,
+    private val onMoveUp: ((Game) -> Unit)? = null,
+    private val onMoveDown: ((Game) -> Unit)? = null
 ) : JPanel() {
 
     private val imageLabel = JLabel()
+    private val upButton = JButton("↑").apply {
+        preferredSize = Dimension(40, 28)
+        maximumSize = Dimension(40, 28)
+        toolTipText = "Move up"
+        addActionListener { onMoveUp?.invoke(game) }
+    }
+    private val downButton = JButton("↓").apply {
+        preferredSize = Dimension(40, 28)
+        maximumSize = Dimension(40, 28)
+        toolTipText = "Move down"
+        addActionListener { onMoveDown?.invoke(game) }
+    }
 
     init {
         initUI()
@@ -124,6 +138,13 @@ class GameItemWidget(
 
         add(infoPanel)
         add(Box.createHorizontalGlue())
+
+        if (launcher.isReorderingMode) {
+            add(upButton)
+            add(Box.createHorizontalStrut(5))
+            add(downButton)
+            add(Box.createHorizontalStrut(5))
+        }
 
         if (game.getGameType() == GameType.WINDOWS) {
             val configureBtn = JButton("Configure").apply {

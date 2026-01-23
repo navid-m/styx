@@ -2,29 +2,18 @@ package com.styx.ui
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.styx.workers.PrefixScanner
-import com.styx.utils.formatTimePlayed
 import com.styx.models.Game
 import com.styx.models.GameType
-import com.styx.models.PrefixInfo
 import com.styx.models.GlobalSettings
+import com.styx.models.PrefixInfo
 import com.styx.utils.Images
-import java.awt.BorderLayout
-import java.awt.Color
-import java.awt.Desktop
-import java.awt.Dimension
-import java.awt.FlowLayout
+import com.styx.utils.formatTimePlayed
+import com.styx.workers.PrefixScanner
+import java.awt.*
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
 import java.awt.datatransfer.UnsupportedFlavorException
-import java.awt.dnd.DnDConstants
-import java.awt.dnd.DragGestureEvent
-import java.awt.dnd.DragGestureListener
-import java.awt.dnd.DragSource
-import java.awt.dnd.DropTarget
-import java.awt.dnd.DropTargetAdapter
-import java.awt.dnd.DropTargetDragEvent
-import java.awt.dnd.DropTargetDropEvent
+import java.awt.dnd.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.WindowAdapter
@@ -32,25 +21,7 @@ import java.awt.event.WindowEvent
 import java.io.File
 import java.nio.file.Paths
 import javax.imageio.ImageIO
-import javax.swing.BorderFactory
-import javax.swing.Box
-import javax.swing.BoxLayout
-import javax.swing.JButton
-import javax.swing.JComponent
-import javax.swing.JFrame
-import javax.swing.JLabel
-import javax.swing.JMenu
-import javax.swing.JMenuBar
-import javax.swing.JMenuItem
-import javax.swing.JOptionPane
-import javax.swing.JPanel
-import javax.swing.JPopupMenu
-import javax.swing.JScrollPane
-import javax.swing.JTabbedPane
-import javax.swing.JTextField
-import javax.swing.KeyStroke
-import javax.swing.SwingUtilities
-import javax.swing.SwingWorker
+import javax.swing.*
 import javax.swing.border.EmptyBorder
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
@@ -67,6 +38,7 @@ class GameLauncher : JFrame("Styx") {
     private val configFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "games.json")
     private val categoriesFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "categories.json")
     private val settingsFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "settings.json")
+    private val gameOrderFile = Paths.get(System.getProperty("user.home"), ".config", "styx", "game_order.json")
     private val originalGovernors = mutableMapOf<String, String>()
     private val gameProcesses = mutableMapOf<String, Process>()
     private val outputWindows = mutableMapOf<String, GameOutputWindow>()
@@ -77,6 +49,7 @@ class GameLauncher : JFrame("Styx") {
     private val gameStartTimes = mutableMapOf<String, Long>()
     private val searchField = JTextField()
     var globalSettings = GlobalSettings()
+    var isReorderingMode = false
 
     @Volatile
     private var isShuttingDown = false
@@ -88,6 +61,8 @@ class GameLauncher : JFrame("Styx") {
         loadCategories()
         loadSettings()
         loadGames()
+        loadGameOrder()
+        refreshGamesList()
         scanPrefixes()
 
         Runtime.getRuntime().addShutdownHook(Thread {
@@ -190,7 +165,7 @@ class GameLauncher : JFrame("Styx") {
 
         val inputMap = rootPane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
         val actionMap = rootPane.actionMap
-        
+
         inputMap.put(KeyStroke.getKeyStroke(';'), "focusSearch")
         actionMap.put("focusSearch", object : javax.swing.AbstractAction() {
             override fun actionPerformed(e: java.awt.event.ActionEvent?) {
@@ -245,6 +220,15 @@ class GameLauncher : JFrame("Styx") {
             accelerator = KeyStroke.getKeyStroke("control COMMA")
         }
         toolsMenu.add(settingsItem)
+        toolsMenu.addSeparator()
+
+        val reorderingModeItem = JCheckBoxMenuItem("Reordering Mode").apply {
+            addActionListener {
+                isReorderingMode = isSelected
+                refreshGamesList()
+            }
+        }
+        toolsMenu.add(reorderingModeItem)
         toolsMenu.addSeparator()
 
         val wineprefixMgrItem = JMenuItem("Wineprefix Manager").apply {
@@ -365,13 +349,13 @@ class GameLauncher : JFrame("Styx") {
                 val type = object : TypeToken<List<Game>>() {}.type
                 games.clear()
                 val loadedGames: List<Game> = gson.fromJson(json, type)
-                
+
                 loadedGames.forEach { game ->
                     if (game.singletonFlags == null) {
                         game.singletonFlags = mutableListOf()
                     }
                 }
-                
+
                 games.addAll(loadedGames)
                 refreshGamesList()
             } catch (e: Exception) {
@@ -435,7 +419,7 @@ class GameLauncher : JFrame("Styx") {
     private fun setCPUGovernor(governor: String, gameName: String): Boolean {
         try {
             val cpuCount = Runtime.getRuntime().availableProcessors()
-            
+
             for (cpu in 0 until cpuCount) {
                 try {
                     val governorFile = File("/sys/devices/system/cpu/cpu$cpu/cpufreq/scaling_governor")
@@ -447,9 +431,11 @@ class GameLauncher : JFrame("Styx") {
                     // Ignore
                 }
             }
-            
-            val pb = ProcessBuilder("pkexec", "sh", "-c",
-                "for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo $governor > \$cpu; done")
+
+            val pb = ProcessBuilder(
+                "pkexec", "sh", "-c",
+                "for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo $governor > \$cpu; done"
+            )
             val process = pb.start()
             val exitCode = process.waitFor()
             return exitCode == 0
@@ -462,7 +448,7 @@ class GameLauncher : JFrame("Styx") {
         try {
             val cpuCount = Runtime.getRuntime().availableProcessors()
             val commands = mutableListOf<String>()
-            
+
             for (cpu in 0 until cpuCount) {
                 val original = originalGovernors["$gameName-cpu$cpu"]
                 if (original != null) {
@@ -470,7 +456,7 @@ class GameLauncher : JFrame("Styx") {
                     originalGovernors.remove("$gameName-cpu$cpu")
                 }
             }
-            
+
             if (commands.isNotEmpty()) {
                 val pb = ProcessBuilder("pkexec", "sh", "-c", commands.joinToString("; "))
                 val process = pb.start()
@@ -568,6 +554,7 @@ class GameLauncher : JFrame("Styx") {
             configFile.parent.createDirectories()
             val json = gson.toJson(games)
             configFile.writeText(json)
+            saveGameOrder()
         } catch (e: Exception) {
             JOptionPane.showMessageDialog(
                 this,
@@ -578,6 +565,65 @@ class GameLauncher : JFrame("Styx") {
         }
     }
 
+    private fun loadGameOrder() {
+        try {
+            if (gameOrderFile.exists()) {
+                val orderJson = gameOrderFile.readText()
+                val orderType = object : TypeToken<List<String>>() {}.type
+                val gameOrder: List<String> = gson.fromJson(orderJson, orderType)
+
+                games.sortWith(compareBy { game ->
+                    val index = gameOrder.indexOf(game.name)
+                    if (index == -1) Int.MAX_VALUE else index
+                })
+            }
+        } catch (e: Exception) {
+            println("Failed to load game order: ${e.message}")
+        }
+    }
+
+    private fun saveGameOrder() {
+        try {
+            if (!gameOrderFile.parent.exists()) {
+                gameOrderFile.parent.createDirectories()
+            }
+            val gameNames = games.map { it.name }
+            gameOrderFile.writeText(gson.toJson(gameNames))
+        } catch (e: Exception) {
+            println("Failed to save game order: ${e.message}")
+        }
+    }
+
+    private fun moveGameUp(game: Game) {
+        val index = games.indexOf(game)
+        if (index > 0) {
+            val temp = games[index - 1]
+            games[index - 1] = games[index]
+            games[index] = temp
+
+            saveGameOrder()
+
+            SwingUtilities.invokeLater {
+                refreshGamesList()
+            }
+        }
+    }
+
+    private fun moveGameDown(game: Game) {
+        val index = games.indexOf(game)
+        if (index >= 0 && index < games.size - 1) {
+            val temp = games[index + 1]
+            games[index + 1] = games[index]
+            games[index] = temp
+
+            saveGameOrder()
+
+            SwingUtilities.invokeLater {
+                refreshGamesList()
+            }
+        }
+    }
+
     fun refreshGamesList() {
         refreshGamesList(null)
     }
@@ -585,7 +631,7 @@ class GameLauncher : JFrame("Styx") {
     private fun refreshGamesList(filter: String?) {
         val scrollPositions = mutableMapOf<String, Int>()
         val currentTabIndex = tabbedPane.selectedIndex
-        
+
         for (i in 0 until tabbedPane.tabCount) {
             val categoryName = tabbedPane.getTitleAt(i)
             val scrollPane = tabbedPane.getComponentAt(i) as? JScrollPane
@@ -593,7 +639,7 @@ class GameLauncher : JFrame("Styx") {
                 scrollPositions[categoryName] = it.verticalScrollBar.value
             }
         }
-        
+
         tabbedPane.removeAll()
         categoryPanels.clear()
 
@@ -632,7 +678,9 @@ class GameLauncher : JFrame("Styx") {
                     ::saveGames,
                     ::isGamePlaying,
                     ::renameGame,
-                    ::openGameConfig
+                    ::openGameConfig,
+                    ::moveGameUp,
+                    ::moveGameDown
                 )
                 gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 70)
                 makeDraggable(gameWidget, game)
@@ -670,7 +718,7 @@ class GameLauncher : JFrame("Styx") {
         if (currentTabIndex >= 0 && currentTabIndex < tabbedPane.tabCount) {
             tabbedPane.selectedIndex = currentTabIndex
         }
-        
+
         SwingUtilities.invokeLater {
             for (i in 0 until tabbedPane.tabCount) {
                 val categoryName = tabbedPane.getTitleAt(i)
@@ -872,7 +920,7 @@ class GameLauncher : JFrame("Styx") {
                     val imageFiles = steamCacheDir.listFiles { file ->
                         file.isFile && file.extension.lowercase() in Images.imageExtensions
                     }
-                    
+
                     if (!imageFiles.isNullOrEmpty()) {
                         val firstImage = imageFiles.first()
                         val copiedImagePath = copyImageToConfigDir(game, firstImage)
@@ -940,22 +988,22 @@ class GameLauncher : JFrame("Styx") {
 
     private fun showAddGameMenu(button: JButton) {
         val popup = JPopupMenu()
-        
+
         val windowsItem = JMenuItem("Windows Game").apply {
             addActionListener { addGame() }
         }
         popup.add(windowsItem)
-        
+
         val nativeItem = JMenuItem("Native Linux Game").apply {
             addActionListener { addNativeGame() }
         }
         popup.add(nativeItem)
-        
+
         val steamItem = JMenuItem("Steam Game").apply {
             addActionListener { addSteamGame() }
         }
         popup.add(steamItem)
-        
+
         popup.show(button, 0, button.height)
     }
 
@@ -1127,7 +1175,7 @@ class GameLauncher : JFrame("Styx") {
 
             gameInList.launchOptions.clear()
             gameInList.launchOptions.putAll(dialog.launchOptions)
-            
+
             if (gameInList.singletonFlags == null) {
                 gameInList.singletonFlags = mutableListOf()
             }
@@ -1323,7 +1371,7 @@ class GameLauncher : JFrame("Styx") {
                         outputWindow.appendOutput(output)
                     }
                 }
-                
+
                 val exitCode = process.waitFor()
 
                 SwingUtilities.invokeLater {
@@ -1529,10 +1577,22 @@ class GameLauncher : JFrame("Styx") {
                 outputWindow.appendOutput("=== Starting Proton Process ===", "#0066cc")
                 outputWindow.appendOutput("Command: ${commandList.joinToString(" ")}")
                 if (globalSettings.globalSingletonFlags.isNotEmpty()) {
-                    outputWindow.appendOutput("Global standalone flags: ${globalSettings.globalSingletonFlags.joinToString(" ")}", "#0088cc")
+                    outputWindow.appendOutput(
+                        "Global standalone flags: ${
+                            globalSettings.globalSingletonFlags.joinToString(
+                                " "
+                            )
+                        }", "#0088cc"
+                    )
                 }
                 if (!game.singletonFlags.isNullOrEmpty()) {
-                    outputWindow.appendOutput("Game standalone flags: ${(game.singletonFlags as Iterable<Any?>).joinToString(" ")}", "#00aa00")
+                    outputWindow.appendOutput(
+                        "Game standalone flags: ${
+                            (game.singletonFlags as Iterable<Any?>).joinToString(
+                                " "
+                            )
+                        }", "#00aa00"
+                    )
                 }
                 outputWindow.appendOutput("")
             } else {
@@ -1544,10 +1604,22 @@ class GameLauncher : JFrame("Styx") {
                 outputWindow.appendOutput("=== Starting Wine Process ===", "#0066cc")
                 outputWindow.appendOutput("Command: ${commandList.joinToString(" ")}")
                 if (globalSettings.globalSingletonFlags.isNotEmpty()) {
-                    outputWindow.appendOutput("Global standalone flags: ${globalSettings.globalSingletonFlags.joinToString(" ")}", "#0088cc")
+                    outputWindow.appendOutput(
+                        "Global standalone flags: ${
+                            globalSettings.globalSingletonFlags.joinToString(
+                                " "
+                            )
+                        }", "#0088cc"
+                    )
                 }
                 if (!game.singletonFlags.isNullOrEmpty()) {
-                    outputWindow.appendOutput("Game standalone flags: ${(game.singletonFlags as Iterable<Any?>).joinToString(" ")}", "#00aa00")
+                    outputWindow.appendOutput(
+                        "Game standalone flags: ${
+                            (game.singletonFlags as Iterable<Any?>).joinToString(
+                                " "
+                            )
+                        }", "#00aa00"
+                    )
                 }
                 outputWindow.appendOutput("")
             }
