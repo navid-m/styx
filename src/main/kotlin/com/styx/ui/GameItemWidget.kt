@@ -3,6 +3,7 @@ package com.styx.ui
 import com.styx.models.Game
 import com.styx.models.GameType
 import com.styx.utils.Images
+import com.styx.utils.SteamStatsParser
 import com.styx.utils.formatTimePlayed
 import java.awt.*
 import java.awt.event.MouseAdapter
@@ -545,7 +546,7 @@ class GameItemWidget(
                     game.executable
                 ) as? String
 
-                if (newSteamId != null && newSteamId.isNotBlank()) {
+                if (!newSteamId.isNullOrBlank()) {
                     val field = game::class.java.getDeclaredField("executable")
                     field.isAccessible = true
                     field.set(game, newSteamId)
@@ -561,10 +562,6 @@ class GameItemWidget(
 
             GameType.WINDOWS -> {
                 // Should NEVER happen.
-            }
-
-            null -> {
-
             }
         }
     }
@@ -594,15 +591,33 @@ class GameItemWidget(
         titleLabel.foreground = launcher.globalSettings.theme.getGameTitleColorObject()
         mainPanel.add(titleLabel, BorderLayout.NORTH)
 
-        val tableData = arrayOf(
-            arrayOf("Time Played", formatTimePlayed(game.timePlayed)),
-            arrayOf("Times Opened", game.timesOpened.toString()),
-            arrayOf("Times Crashed", game.timesCrashed.toString()),
-            arrayOf("Wineprefix Path", game.prefix),
-            arrayOf("Compatibility Layer", game.protonVersion ?: "Wine (default)"),
-            arrayOf("Game Size", "Calculating..."),
-            arrayOf("Wine Prefix Size", "Calculating...")
-        )
+        val tableData = if (game.getGameType() == GameType.STEAM && !game.steamAppId.isNullOrEmpty()) {
+            val steamStats = SteamStatsParser.getGameStats(game.steamAppId!!)
+
+            arrayOf(
+                arrayOf("Steam App ID", game.steamAppId ?: "Unknown"),
+                arrayOf("Runtime", "Steam Runtime"),
+                arrayOf("Time Played (Styx)", formatTimePlayed(game.timePlayed)),
+                arrayOf("Time Played (Steam)", SteamStatsParser.formatPlaytime(steamStats?.playtime)),
+                arrayOf("Playtime (Last 2 Weeks)", SteamStatsParser.formatPlaytime(steamStats?.playtime2weeks)),
+                arrayOf("Last Played", SteamStatsParser.formatTimestamp(steamStats?.lastPlayed)),
+                arrayOf("Last Launch Time", SteamStatsParser.formatTimestamp(steamStats?.lastLaunch)),
+                arrayOf("Last Exit Time", SteamStatsParser.formatTimestamp(steamStats?.lastExit)),
+                arrayOf("Cloud Sync Status", steamStats?.cloudSyncState?.capitalize() ?: "Unknown"),
+                arrayOf("Times Opened (Styx)", game.timesOpened.toString()),
+                arrayOf("Times Crashed (Styx)", game.timesCrashed.toString())
+            )
+        } else {
+            arrayOf(
+                arrayOf("Time Played", formatTimePlayed(game.timePlayed)),
+                arrayOf("Times Opened", game.timesOpened.toString()),
+                arrayOf("Times Crashed", game.timesCrashed.toString()),
+                arrayOf("Wineprefix Path", game.prefix),
+                arrayOf("Compatibility Layer", game.protonVersion ?: "Wine (default)"),
+                arrayOf("Game Size", "Calculating..."),
+                arrayOf("Wine Prefix Size", "Calculating...")
+            )
+        }
 
         val columnNames = arrayOf("Statistic", "Value")
         val tableModel = DefaultTableModel(tableData, columnNames)
@@ -646,19 +661,21 @@ class GameItemWidget(
         val scrollPane = JScrollPane(table)
         mainPanel.add(scrollPane, BorderLayout.CENTER)
 
-        Thread {
-            val gameSize = calculateDirectorySize(File(game.executable).parentFile)
-            SwingUtilities.invokeLater {
-                tableModel.setValueAt(formatFileSize(gameSize), 5, 1)
-            }
-        }.start()
+        if (game.getGameType() != GameType.STEAM) {
+            Thread {
+                val gameSize = calculateDirectorySize(File(game.executable).parentFile)
+                SwingUtilities.invokeLater {
+                    tableModel.setValueAt(formatFileSize(gameSize), 5, 1)
+                }
+            }.start()
 
-        Thread {
-            val prefixSize = calculateDirectorySize(File(game.prefix))
-            SwingUtilities.invokeLater {
-                tableModel.setValueAt(formatFileSize(prefixSize), 6, 1)
-            }
-        }.start()
+            Thread {
+                val prefixSize = calculateDirectorySize(File(game.prefix))
+                SwingUtilities.invokeLater {
+                    tableModel.setValueAt(formatFileSize(prefixSize), 6, 1)
+                }
+            }.start()
+        }
 
         val buttonPanel = JPanel()
         val closeButton = JButton("Close")
@@ -681,8 +698,8 @@ class GameItemWidget(
                         if (Files.isRegularFile(path)) {
                             size += Files.size(path)
                         }
-                    } catch (e: Exception) {
-                        // Skip files that can't be accessed
+                    } catch (_: Exception) {
+                        // Ignore.
                     }
                 }
             }
