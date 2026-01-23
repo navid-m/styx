@@ -2,6 +2,7 @@ package com.styx.ui
 
 import com.styx.models.Game
 import com.styx.models.GameType
+import com.styx.utils.Images
 import com.styx.utils.formatTimePlayed
 import java.awt.BorderLayout
 import java.awt.Color
@@ -629,15 +630,13 @@ class GameItemWidget(
     private fun updateArtFromGameDirectory() {
         val gameDir = File(game.executable).parentFile
         if (gameDir != null && gameDir.exists()) {
-            val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "bmp", "webp")
-
             val imageFiles = mutableListOf<File>()
 
             fun searchImages(dir: File) {
                 dir.listFiles()?.forEach { file ->
                     if (file.isDirectory) {
                         searchImages(file)
-                    } else if (file.extension.lowercase() in imageExtensions) {
+                    } else if (file.extension.lowercase() in Images.imageExtensions) {
                         imageFiles.add(file)
                     }
                 }

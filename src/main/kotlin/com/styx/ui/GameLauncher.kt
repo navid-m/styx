@@ -8,6 +8,7 @@ import com.styx.models.Game
 import com.styx.models.GameType
 import com.styx.models.PrefixInfo
 import com.styx.models.GlobalSettings
+import com.styx.utils.Images
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Desktop
@@ -873,14 +874,13 @@ class GameLauncher : JFrame("Styx") {
 
         val gameDir = File(game.executable).parentFile
         if (gameDir != null && gameDir.exists()) {
-            val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "bmp", "webp")
             val imageFiles = mutableListOf<File>()
 
             fun searchImages(dir: File) {
                 dir.listFiles()?.forEach { file ->
                     if (file.isDirectory) {
                         searchImages(file)
-                    } else if (file.extension.lowercase() in imageExtensions) {
+                    } else if (file.extension.lowercase() in Images.imageExtensions) {
                         imageFiles.add(file)
                     }
                 }
