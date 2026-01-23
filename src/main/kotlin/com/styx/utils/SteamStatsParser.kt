@@ -8,7 +8,6 @@ import java.util.*
  * Parser for extracting Steam game statistics from VDF files.
  */
 object SteamStatsParser {
-
     data class SteamGameStats(
         val playtime: Long? = null,
         val playtime2weeks: Long? = null,
