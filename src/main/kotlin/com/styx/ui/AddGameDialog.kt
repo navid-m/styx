@@ -1,24 +1,13 @@
 package com.styx.ui
 
-import com.styx.api.SteamApiHelper
+import com.styx.api.SteamApi
 import com.styx.models.Game
 import com.styx.models.PrefixInfo
 import java.awt.Color
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.io.File
-import javax.swing.Box
-import javax.swing.BoxLayout
-import javax.swing.JButton
-import javax.swing.JComboBox
-import javax.swing.JDialog
-import javax.swing.JFileChooser
-import javax.swing.JFrame
-import javax.swing.JLabel
-import javax.swing.JOptionPane
-import javax.swing.JPanel
-import javax.swing.JTextField
-import javax.swing.SwingUtilities
+import javax.swing.*
 import javax.swing.border.EmptyBorder
 import javax.swing.filechooser.FileNameExtensionFilter
 
@@ -183,7 +172,7 @@ class AddGameDialog(
 
         if (steamAppId == null) {
             try {
-                val results = SteamApiHelper.searchGameByName(name)
+                val results = SteamApi.searchGameByName(name)
                 if (results.isNotEmpty()) {
                     steamAppId = results[0].appid
                 }
@@ -216,7 +205,7 @@ class AddGameDialog(
         progressDialog.setLocationRelativeTo(this)
 
         Thread {
-            val results = SteamApiHelper.searchGameByName(gameName)
+            val results = SteamApi.searchGameByName(gameName)
 
             SwingUtilities.invokeLater {
                 progressDialog.dispose()

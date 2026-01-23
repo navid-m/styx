@@ -1,20 +1,11 @@
 package com.styx.ui
 
-import com.styx.api.SteamApiHelper
+import com.styx.api.SteamApi
 import com.styx.models.Game
 import com.styx.models.GameType
 import java.awt.Dimension
 import java.awt.FlowLayout
-import javax.swing.Box
-import javax.swing.BoxLayout
-import javax.swing.JButton
-import javax.swing.JDialog
-import javax.swing.JFrame
-import javax.swing.JLabel
-import javax.swing.JOptionPane
-import javax.swing.JPanel
-import javax.swing.JTextField
-import javax.swing.SwingUtilities
+import javax.swing.*
 import javax.swing.border.EmptyBorder
 
 class AddSteamGameDialog(parent: JFrame) : JDialog(parent, "Add Steam Game", true) {
@@ -45,14 +36,14 @@ class AddSteamGameDialog(parent: JFrame) : JDialog(parent, "Add Steam Game", tru
         steamIdLabel.preferredSize = Dimension(100, 25)
         steamIdPanel.add(steamIdLabel)
         steamIdPanel.add(steamIdInput)
-        
+
         val autodetectBtn = JButton("Autodetect").apply {
             preferredSize = Dimension(100, 28)
             toolTipText = "Search Steam for this game by name"
             addActionListener { autodetectSteamAppId() }
         }
         steamIdPanel.add(autodetectBtn)
-        
+
         mainPanel.add(steamIdPanel)
 
         val helpLabel = JLabel("<html><i>Example: For Counter-Strike 2, use 730</i></html>")
@@ -136,7 +127,7 @@ class AddSteamGameDialog(parent: JFrame) : JDialog(parent, "Add Steam Game", tru
         progressDialog.setLocationRelativeTo(this)
 
         Thread {
-            val results = SteamApiHelper.searchGameByName(gameName)
+            val results = SteamApi.searchGameByName(gameName)
 
             SwingUtilities.invokeLater {
                 progressDialog.dispose()

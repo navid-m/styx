@@ -1,20 +1,12 @@
 package com.styx.ui
 
-import com.styx.api.SteamApiHelper
+import com.styx.api.SteamApi
 import com.styx.models.Game
 import com.styx.models.GameType
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.io.File
-import javax.swing.Box
-import javax.swing.BoxLayout
-import javax.swing.JButton
-import javax.swing.JDialog
-import javax.swing.JFileChooser
-import javax.swing.JLabel
-import javax.swing.JOptionPane
-import javax.swing.JPanel
-import javax.swing.JTextField
+import javax.swing.*
 import javax.swing.border.EmptyBorder
 
 class AddNativeGameDialog(private val launcher: GameLauncher) : JDialog(launcher, "Add Native Linux Game", true) {
@@ -109,7 +101,7 @@ class AddNativeGameDialog(private val launcher: GameLauncher) : JDialog(launcher
 
         var steamAppId: String? = null
         try {
-            val results = SteamApiHelper.searchGameByName(name)
+            val results = SteamApi.searchGameByName(name)
             if (results.isNotEmpty()) {
                 steamAppId = results[0].appid
             }

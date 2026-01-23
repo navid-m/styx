@@ -9,7 +9,7 @@ import java.net.URLEncoder
 /**
  * Helper object for Steam API operations
  */
-object SteamApiHelper {
+object SteamApi {
     data class SteamSearchResult(val appid: String, val name: String)
 
     fun searchGameByName(gameName: String): List<SteamSearchResult> {
@@ -17,6 +17,7 @@ object SteamApiHelper {
             val encodedName = URLEncoder.encode(gameName, "UTF-8")
             val url = URL("https://steamcommunity.com/actions/SearchApps/$encodedName")
             val connection = url.openConnection() as HttpURLConnection
+            
             connection.requestMethod = "GET"
             connection.connectTimeout = 5000
             connection.readTimeout = 5000

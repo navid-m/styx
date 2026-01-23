@@ -1,29 +1,13 @@
 package com.styx.ui
 
-import com.styx.api.SteamApiHelper
+import com.styx.api.SteamApi
 import com.styx.models.Game
 import com.styx.models.GameType
 import com.styx.utils.formatTimePlayed
-import java.awt.BorderLayout
-import java.awt.Color
-import java.awt.Desktop
-import java.awt.Dimension
-import java.awt.FlowLayout
-import java.awt.Font
+import java.awt.*
 import java.io.File
 import java.net.URI
-import javax.swing.BorderFactory
-import javax.swing.Box
-import javax.swing.BoxLayout
-import javax.swing.JButton
-import javax.swing.JComboBox
-import javax.swing.JDialog
-import javax.swing.JLabel
-import javax.swing.JOptionPane
-import javax.swing.JPanel
-import javax.swing.JTextField
-import javax.swing.SwingConstants
-import javax.swing.SwingUtilities
+import javax.swing.*
 import javax.swing.border.EmptyBorder
 
 class GameConfigDialog(
@@ -400,7 +384,7 @@ class GameConfigDialog(
         progressDialog.setLocationRelativeTo(this)
 
         Thread {
-            val results = SteamApiHelper.searchGameByName(gameName)
+            val results = SteamApi.searchGameByName(gameName)
 
             SwingUtilities.invokeLater {
                 progressDialog.dispose()
