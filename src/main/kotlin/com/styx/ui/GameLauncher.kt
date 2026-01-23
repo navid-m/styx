@@ -167,7 +167,7 @@ class GameLauncher : JFrame("Styx") {
         val actionMap = rootPane.actionMap
 
         inputMap.put(KeyStroke.getKeyStroke(';'), "focusSearch")
-        actionMap.put("focusSearch", object : javax.swing.AbstractAction() {
+        actionMap.put("focusSearch", object : AbstractAction() {
             override fun actionPerformed(e: java.awt.event.ActionEvent?) {
                 searchField.requestFocusInWindow()
                 searchField.selectAll()
