@@ -15,29 +15,11 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import javax.imageio.ImageIO
 import javax.swing.*
-import javax.swing.border.AbstractBorder
 import javax.swing.border.EmptyBorder
 import javax.swing.filechooser.FileNameExtensionFilter
 import javax.swing.table.DefaultTableCellRenderer
 import javax.swing.table.DefaultTableModel
 import kotlin.math.min
-
-class RoundedBorder(private val color: Color, private val thickness: Int, private val radius: Int) : AbstractBorder() {
-    override fun paintBorder(c: Component, g: Graphics, x: Int, y: Int, width: Int, height: Int) {
-        val g2 = g.create() as Graphics2D
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-        g2.color = color
-        g2.stroke = java.awt.BasicStroke(thickness.toFloat())
-        g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius)
-        g2.dispose()
-    }
-
-    override fun getBorderInsets(c: Component): Insets {
-        return Insets(thickness, thickness, thickness, thickness)
-    }
-
-    override fun isBorderOpaque(): Boolean = false
-}
 
 class GameItemWidget(
     private val game: Game,
