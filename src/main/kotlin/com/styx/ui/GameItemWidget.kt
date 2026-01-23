@@ -288,8 +288,16 @@ class GameItemWidget(
             }
         }
 
+        val clearArtItem = JMenuItem("Clear Art").apply {
+            addActionListener {
+                clearGameArt()
+            }
+        }
+
         imagePopupMenu.add(updateArtItem)
         imagePopupMenu.add(browseImageItem)
+        imagePopupMenu.addSeparator()
+        imagePopupMenu.add(clearArtItem)
 
         imageLabel.addMouseListener(object : MouseAdapter() {
             override fun mousePressed(e: MouseEvent) {
@@ -784,6 +792,22 @@ class GameItemWidget(
         } catch (e: Exception) {
             e.printStackTrace()
             return null
+        }
+    }
+
+    private fun clearGameArt() {
+        val result = JOptionPane.showConfirmDialog(
+            this,
+            "Are you sure you want to clear the art for '${game.name}'?\nThis will replace it with the placeholder image.",
+            "Clear Art",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE
+        )
+
+        if (result == JOptionPane.YES_OPTION) {
+            game.imagePath = null
+            updateImage()
+            onSaveGames()
         }
     }
 }
