@@ -52,6 +52,7 @@ class GameLauncher : JFrame("Styx") {
 
     var globalSettings = GlobalSettings()
     var isReorderingMode = false
+    var isGridView = false
 
     @Volatile
     private var isShuttingDown = false
@@ -243,6 +244,16 @@ class GameLauncher : JFrame("Styx") {
         }
         toolsMenu.add(wineserverMgmtItem)
 
+        val viewMenu = JMenu("View")
+        val gridViewItem = JCheckBoxMenuItem("Grid View").apply {
+            addActionListener {
+                isGridView = isSelected
+                refreshGamesList()
+            }
+            accelerator = KeyStroke.getKeyStroke("control G")
+        }
+        viewMenu.add(gridViewItem)
+
         val helpMenu = JMenu("Help")
         val aboutItem = JMenuItem("About").apply {
             addActionListener { showAboutDialog() }
@@ -251,6 +262,7 @@ class GameLauncher : JFrame("Styx") {
         helpMenu.add(aboutItem)
         menuBar.add(fileMenu)
         menuBar.add(toolsMenu)
+        menuBar.add(viewMenu)
         menuBar.add(helpMenu)
 
         jMenuBar = menuBar
@@ -647,7 +659,13 @@ class GameLauncher : JFrame("Styx") {
 
         categories.forEach { category ->
             val panel = JPanel()
-            panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
+
+            if (isGridView) {
+                panel.layout = WrapLayout(FlowLayout.LEFT, 10, 10)
+            } else {
+                panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
+            }
+
             panel.border = EmptyBorder(10, 5, 5, 5)
 
             setupDragAndDrop(panel, category)
@@ -680,20 +698,46 @@ class GameLauncher : JFrame("Styx") {
                     ::renameGame,
                     ::openGameConfig,
                     ::moveGameUp,
-                    ::moveGameDown
+                    ::moveGameDown,
+                    isGridView
                 )
-                gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 70)
+
+                if (isGridView) {
+                    gameWidget.preferredSize = Dimension(280, 120)
+                    gameWidget.maximumSize = Dimension(280, 120)
+                    gameWidget.minimumSize = Dimension(280, 120)
+                } else {
+                    gameWidget.maximumSize = Dimension(Int.MAX_VALUE, 70)
+                }
+
                 makeDraggable(gameWidget, game)
                 panel.add(gameWidget)
-                panel.add(Box.createVerticalStrut(5))
+
+                if (!isGridView) {
+                    panel.add(Box.createVerticalStrut(5))
+                }
             }
 
-            panel.add(Box.createVerticalGlue())
+            if (!isGridView) {
+                panel.add(Box.createVerticalGlue())
+            }
 
             val scrollPane = JScrollPane(panel)
             scrollPane.verticalScrollBar.unitIncrement = 16
             scrollPane.verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_ALWAYS
-            scrollPane.horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
+
+            if (isGridView) {
+                scrollPane.horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
+                scrollPane.viewport.addChangeListener {
+                    val viewportWidth = scrollPane.viewport.width
+                    if (viewportWidth > 0) {
+                        panel.size = Dimension(viewportWidth, panel.height)
+                        panel.revalidate()
+                    }
+                }
+            } else {
+                scrollPane.horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
+            }
 
             tabbedPane.addTab(category, scrollPane)
             categoryPanels[category] = panel

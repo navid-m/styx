@@ -34,7 +34,8 @@ class GameItemWidget(
     private val onRename: (Game) -> Unit,
     private val onConfigure: (Game) -> Unit,
     private val onMoveUp: ((Game) -> Unit)? = null,
-    private val onMoveDown: ((Game) -> Unit)? = null
+    private val onMoveDown: ((Game) -> Unit)? = null,
+    private val isGridMode: Boolean = false
 ) : JPanel() {
 
     private val imageLabel = JLabel()
@@ -56,6 +57,16 @@ class GameItemWidget(
     }
 
     private fun initUI() {
+        if (isGridMode) {
+            initGridUI()
+        } else {
+            initListUI()
+        }
+        setupContextMenu()
+        setupImageContextMenu()
+    }
+
+    private fun initListUI() {
         layout = BoxLayout(this, BoxLayout.X_AXIS)
         border = BorderFactory.createCompoundBorder(
             RoundedBorder(Color(48, 47, 47), 1, 15),
@@ -63,7 +74,7 @@ class GameItemWidget(
         )
         background = Color(34, 35, 36)
 
-        updateImage()
+        updateImageForSize(60)
         imageLabel.preferredSize = Dimension(60, 60)
         imageLabel.minimumSize = Dimension(60, 60)
         imageLabel.maximumSize = Dimension(60, 60)
@@ -153,41 +164,140 @@ class GameItemWidget(
         setupImageContextMenu()
     }
 
-    private fun updateImage() {
+    private fun initGridUI() {
+        layout = BorderLayout()
+        border = BorderFactory.createCompoundBorder(
+            RoundedBorder(Color(48, 47, 47), 1, 15),
+            EmptyBorder(8, 8, 8, 8)
+        )
+        background = Color(34, 35, 36)
+
+        val topPanel = JPanel()
+        topPanel.layout = BoxLayout(topPanel, BoxLayout.X_AXIS)
+        topPanel.isOpaque = false
+
+        updateImageForSize(50)
+        imageLabel.preferredSize = Dimension(50, 50)
+        imageLabel.minimumSize = Dimension(50, 50)
+        imageLabel.maximumSize = Dimension(50, 50)
+        imageLabel.border = EmptyBorder(0, 0, 0, 0)
+        topPanel.add(imageLabel)
+        topPanel.add(Box.createHorizontalStrut(8))
+
+        val infoPanel = JPanel()
+        infoPanel.layout = BoxLayout(infoPanel, BoxLayout.Y_AXIS)
+        infoPanel.isOpaque = false
+
+        val nameLabel = JLabel(game.name)
+        nameLabel.font = nameLabel.font.deriveFont(Font.PLAIN, 12f)
+        nameLabel.foreground = launcher.globalSettings.theme.getGameTitleColorObject()
+        infoPanel.add(nameLabel)
+
+        val typeOrPrefixLabel: JLabel = when (game.getGameType()) {
+            GameType.NATIVE_LINUX -> JLabel("Native Linux").apply {
+                font = font.deriveFont(10f)
+                foreground = launcher.globalSettings.theme.getMetadataLabelColorObject()
+            }
+
+            GameType.STEAM -> JLabel("Steam").apply {
+                font = font.deriveFont(10f)
+                foreground = launcher.globalSettings.theme.getMetadataLabelColorObject()
+            }
+
+            GameType.WINDOWS -> {
+                val number = Regex("/(\\d+)/").find(game.prefix)?.groupValues?.get(1)
+                JLabel("Prefix: $number").apply {
+                    font = font.deriveFont(10f)
+                    foreground = Color.LIGHT_GRAY
+                }
+            }
+        }
+        infoPanel.add(typeOrPrefixLabel)
+
+        val statusLabel = if (isGamePlaying(game)) {
+            JLabel("▶ Playing").apply {
+                foreground = Color(0, 255, 0)
+                font = font.deriveFont(Font.BOLD, 10f)
+            }
+        } else if (game.getGameType() == GameType.STEAM) {
+            JLabel("ID: ${game.steamAppId ?: game.executable}").apply {
+                foreground = launcher.globalSettings.theme.getTimePlayedColorObject()
+                font = font.deriveFont(9f)
+            }
+        } else {
+            JLabel(formatTimePlayed(game.timePlayed)).apply {
+                foreground = launcher.globalSettings.theme.getTimePlayedColorObject()
+                font = font.deriveFont(10f)
+            }
+        }
+        infoPanel.add(statusLabel)
+
+        topPanel.add(infoPanel)
+        add(topPanel, BorderLayout.CENTER)
+
+        val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 3, 0))
+        buttonPanel.isOpaque = false
+
+        if (game.getGameType() == GameType.WINDOWS) {
+            val configureBtn = JButton("Config").apply {
+                preferredSize = Dimension(70, 24)
+                font = font.deriveFont(10f)
+                toolTipText = "Configure game settings"
+                addActionListener { onConfigure(game) }
+            }
+            buttonPanel.add(configureBtn)
+        }
+
+        val launchBtn = JButton("Launch").apply {
+            preferredSize = Dimension(70, 24)
+            font = font.deriveFont(Font.BOLD, 10f)
+            addActionListener { onLaunch(game) }
+        }
+        launchBtn.background = Color.DARK_GRAY
+        buttonPanel.add(launchBtn)
+
+        add(buttonPanel, BorderLayout.SOUTH)
+    }
+
+    private fun updateImageForSize(size: Int) {
         if (game.imagePath != null) {
             val imageFile = File(game.imagePath!!)
             if (imageFile.exists()) {
                 try {
                     val bufferedImage = ImageIO.read(imageFile)
                     if (bufferedImage != null) {
-                        val croppedImage = cropAndScaleImage(bufferedImage, 60, 60)
+                        val croppedImage = cropAndScaleImage(bufferedImage, size, size)
                         val roundedImage = createRoundedImage(croppedImage, 9)
                         imageLabel.icon = ImageIcon(roundedImage)
                     } else {
                         println("ImageIO.read returned null for: ${imageFile.absolutePath}")
-                        imageLabel.icon = createPlaceholderIcon()
+                        imageLabel.icon = createPlaceholderIcon(size)
                     }
                 } catch (e: Exception) {
                     println("Error loading image: ${e.message}")
                     e.printStackTrace()
-                    imageLabel.icon = createPlaceholderIcon()
+                    imageLabel.icon = createPlaceholderIcon(size)
                 }
             } else {
                 println("Image file does not exist: ${imageFile.absolutePath}")
-                imageLabel.icon = createPlaceholderIcon()
+                imageLabel.icon = createPlaceholderIcon(size)
             }
         } else {
-            imageLabel.icon = createPlaceholderIcon()
+            imageLabel.icon = createPlaceholderIcon(size)
         }
     }
 
-    private fun createPlaceholderIcon(): Icon {
+    private fun updateImage() {
+        updateImageForSize(60)
+    }
+
+    private fun createPlaceholderIcon(size: Int = 60): Icon {
         try {
             val placeholderStream = javaClass.getResourceAsStream("/placeholder.jpg")
             if (placeholderStream != null) {
                 val placeholderImage = ImageIO.read(placeholderStream)
                 if (placeholderImage != null) {
-                    val scaledImage = cropAndScaleImage(placeholderImage, 60, 60)
+                    val scaledImage = cropAndScaleImage(placeholderImage, size, size)
                     val roundedImage = createRoundedImage(scaledImage, 9)
                     return ImageIcon(roundedImage)
                 }
@@ -196,10 +306,10 @@ class GameItemWidget(
             println("Failed to load placeholder image: ${e.message}")
         }
 
-        val placeholder = BufferedImage(60, 60, BufferedImage.TYPE_INT_ARGB)
+        val placeholder = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
         val g2d = placeholder.createGraphics()
         g2d.color = Color.GRAY
-        g2d.fillRect(0, 0, 60, 60)
+        g2d.fillRect(0, 0, size, size)
         g2d.dispose()
         return ImageIcon(placeholder)
     }
