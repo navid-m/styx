@@ -866,6 +866,22 @@ class GameLauncher : JFrame("Styx") {
 
     private fun autoSetGameImage(game: Game) {
         if (game.getGameType() == GameType.STEAM) {
+            game.steamAppId?.let { steamId ->
+                val steamCacheDir = File(System.getProperty("user.home"), ".steam/steam/appcache/librarycache/$steamId")
+                if (steamCacheDir.exists() && steamCacheDir.isDirectory) {
+                    val imageFiles = steamCacheDir.listFiles { file ->
+                        file.isFile && file.extension.lowercase() in Images.imageExtensions
+                    }
+                    
+                    if (!imageFiles.isNullOrEmpty()) {
+                        val firstImage = imageFiles.first()
+                        val copiedImagePath = copyImageToConfigDir(game, firstImage)
+                        if (copiedImagePath != null) {
+                            game.imagePath = copiedImagePath
+                        }
+                    }
+                }
+            }
             return
         }
 

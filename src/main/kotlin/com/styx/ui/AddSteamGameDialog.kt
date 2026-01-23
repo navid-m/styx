@@ -112,7 +112,7 @@ class AddSteamGameDialog(parent: JFrame) : JDialog(parent, "Add Steam Game", tru
             return
         }
 
-        gameData = Game(name, steamAppId, "", type = GameType.STEAM)
+        gameData = Game(name, steamAppId, "", type = GameType.STEAM, steamAppId = steamAppId)
         dispose()
     }
 
