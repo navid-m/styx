@@ -26,11 +26,9 @@ class WrapLayout(align: Int = LEFT, hgap: Int = 5, vgap: Int = 5) : FlowLayout(a
             val insets: Insets = target.insets
             val horizontalInsetsAndGap = insets.left + insets.right + (hgap * 2)
             val maxWidth = targetWidth - horizontalInsetsAndGap
-
             val dim = Dimension(0, 0)
             var rowWidth = 0
             var rowHeight = 0
-
             val nmembers = target.componentCount
 
             for (i in 0 until nmembers) {
