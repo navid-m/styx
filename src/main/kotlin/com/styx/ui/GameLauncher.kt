@@ -48,14 +48,13 @@ class GameLauncher : JFrame("Styx") {
     private val logReaderThreads = mutableListOf<Thread>()
     private val gameStartTimes = mutableMapOf<String, Long>()
     private val searchField = JTextField()
-    
+    private val gson = Gson()
+
     var globalSettings = GlobalSettings()
     var isReorderingMode = false
 
     @Volatile
     private var isShuttingDown = false
-
-    private val gson = Gson()
 
     init {
         initUI()
