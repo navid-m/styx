@@ -14,7 +14,6 @@ import java.awt.Color
 import java.awt.Desktop
 import java.awt.Dimension
 import java.awt.FlowLayout
-import java.awt.Font
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
 import java.awt.datatransfer.UnsupportedFlavorException
@@ -711,8 +710,6 @@ class GameLauncher : JFrame("Styx") {
 
     private fun setupTabDropTargets() {
         tabbedPane.dropTarget = DropTarget(tabbedPane, object : DropTargetAdapter() {
-            private var draggedGameName: String? = null
-
             override fun dragEnter(dtde: DropTargetDragEvent) {
                 dtde.acceptDrag(DnDConstants.ACTION_MOVE)
             }
