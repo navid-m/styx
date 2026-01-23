@@ -7,5 +7,5 @@ data class ScriptableTaskDetails(
     val description: String? = null,
     val app: String? = null,
     val executable: String? = null,
-    val exclude_processes: String? = null
+    val excludeProcesses: String? = null
 )

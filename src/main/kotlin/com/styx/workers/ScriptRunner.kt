@@ -189,7 +189,7 @@ class ScriptRunner(
         }
 
         outputCallback("Executing: $executablePath", null)
-        task.exclude_processes?.let {
+        task.excludeProcesses?.let {
             outputCallback("Monitoring for processes: $it", "#00aa00")
         }
 
@@ -200,8 +200,8 @@ class ScriptRunner(
 
             val process = pb.start()
 
-            if (task.exclude_processes != null) {
-                val excludeList = task.exclude_processes.split(" ").map { it.trim() }
+            if (task.excludeProcesses != null) {
+                val excludeList = task.excludeProcesses.split(" ").map { it.trim() }
                 outputCallback("Waiting for processes: ${excludeList.joinToString(", ")}", null)
 
                 Thread {
@@ -295,7 +295,7 @@ class ScriptRunner(
                             description = taskDetails["description"]?.toString(),
                             app = taskDetails["app"]?.toString(),
                             executable = taskDetails["executable"]?.toString(),
-                            exclude_processes = taskDetails["exclude_processes"]?.toString()
+                            excludeProcesses = taskDetails["exclude_processes"]?.toString()
                         )
                     )
                 }
