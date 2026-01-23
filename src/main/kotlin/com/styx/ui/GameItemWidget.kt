@@ -235,13 +235,32 @@ class GameItemWidget(
         }
 
         val croppedImage = image.getSubimage(cropX, cropY, cropWidth, cropHeight)
+        var currentImage = croppedImage
+        var currentWidth = cropWidth
+        var currentHeight = cropHeight
+        
+        while (currentWidth > targetWidth * 2 && currentHeight > targetHeight * 2) {
+            currentWidth /= 2
+            currentHeight /= 2
+            
+            val tempImage = BufferedImage(currentWidth, currentHeight, BufferedImage.TYPE_INT_ARGB)
+            val g2d = tempImage.createGraphics()
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            g2d.drawImage(currentImage, 0, 0, currentWidth, currentHeight, null)
+            g2d.dispose()
+            
+            currentImage = tempImage
+        }
+        
         val scaledImage = BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_ARGB)
         val g2d = scaledImage.createGraphics()
-
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
         g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-        g2d.drawImage(croppedImage, 0, 0, targetWidth, targetHeight, null)
+        g2d.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY)
+        g2d.drawImage(currentImage, 0, 0, targetWidth, targetHeight, null)
         g2d.dispose()
 
         return scaledImage
