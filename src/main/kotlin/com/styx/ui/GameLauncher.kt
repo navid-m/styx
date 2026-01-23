@@ -48,6 +48,7 @@ class GameLauncher : JFrame("Styx") {
     private val logReaderThreads = mutableListOf<Thread>()
     private val gameStartTimes = mutableMapOf<String, Long>()
     private val searchField = JTextField()
+    
     var globalSettings = GlobalSettings()
     var isReorderingMode = false
 
