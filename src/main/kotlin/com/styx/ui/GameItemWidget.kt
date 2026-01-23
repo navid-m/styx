@@ -123,7 +123,7 @@ class GameItemWidget(
 
             GameType.WINDOWS -> {
                 val number = Regex("/(\\d+)/").find(game.prefix)?.groupValues?.get(1)
-                JLabel("Prefix: ${number}").apply {
+                JLabel("Prefix: $number").apply {
                     font = font.deriveFont(11f)
                     foreground = Color.LIGHT_GRAY
                 }
