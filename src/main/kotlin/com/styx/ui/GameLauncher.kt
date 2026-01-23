@@ -211,7 +211,6 @@ class GameLauncher : JFrame("Styx") {
             addActionListener { handleApplicationClose() }
             accelerator = KeyStroke.getKeyStroke("control Q")
         }
-
         fileMenu.add(quitItem)
 
         val toolsMenu = JMenu("Tools")
