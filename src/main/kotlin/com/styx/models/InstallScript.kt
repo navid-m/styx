@@ -1,5 +1,8 @@
 package com.styx.models
 
+/**
+ * Some installation script, originally in YAML format.
+ */
 data class InstallScript(
     val files: List<LutrisFile>? = null,
     val game: LutrisGame? = null,
