@@ -182,7 +182,7 @@ class ChangePrefixDialog(
                                     }
                                 }
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         // Continue
                     }
                 }

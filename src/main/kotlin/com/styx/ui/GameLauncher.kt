@@ -956,6 +956,23 @@ class GameLauncher : JFrame("Styx") {
         }
     }
 
+    private fun autodetectSteamLibrary() {
+        val dialog = AutodetectSteamLibraryDialog(this, games)
+        dialog.isVisible = true
+
+        if (dialog.selectedGames.isNotEmpty()) {
+            var addedCount = 0
+            for (newGame in dialog.selectedGames) {
+                autoSetGameImage(newGame)
+                games.add(newGame)
+                addedCount++
+            }
+            saveGames()
+            refreshGamesList()
+            statusLabel.text = "Added $addedCount Steam ${if (addedCount == 1) "game" else "games"} from library"
+        }
+    }
+
     private fun autoSetGameImage(game: Game) {
         if (game.getGameType() == GameType.STEAM) {
             game.steamAppId?.let { steamId ->
@@ -1047,6 +1064,13 @@ class GameLauncher : JFrame("Styx") {
             addActionListener { addSteamGame() }
         }
         popup.add(steamItem)
+
+        popup.addSeparator()
+
+        val autodetectSteamItem = JMenuItem("Autodetect Steam Library...").apply {
+            addActionListener { autodetectSteamLibrary() }
+        }
+        popup.add(autodetectSteamItem)
 
         popup.show(button, 0, button.height)
     }
