@@ -114,8 +114,14 @@ object SteamLibraryScanner {
     }
 
     private fun extractValue(line: String): String? {
-        val quotePattern = Regex("[\"']([^\"']*)[\"']\\s+[\"']([^\"']*)[\"']")
-        val match = quotePattern.find(line)
-        return match?.groupValues?.get(2)
+        val doubleQuotePattern = Regex("\"([^\"]+)\"\\s+\"([^\"]+)\"")
+        val doubleMatch = doubleQuotePattern.find(line)
+        if (doubleMatch != null) {
+            return doubleMatch.groupValues[2]
+        }
+        
+        val singleQuotePattern = Regex("'([^']+)'\\s+'([^']+)'")
+        val singleMatch = singleQuotePattern.find(line)
+        return singleMatch?.groupValues?.get(2)
     }
 }
