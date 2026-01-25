@@ -9,7 +9,8 @@ import java.awt.FlowLayout
 import javax.swing.*
 import javax.swing.border.EmptyBorder
 
-class AutodetectSteamLibraryDialog(parent: JFrame, existingGames: List<Game>) : JDialog(parent, "Autodetect Steam Library", true) {
+class AutoDetectSteamLibraryDialog(parent: JFrame, existingGames: List<Game>) :
+    JDialog(parent, "Autodetect Steam Library", true) {
     private val checkBoxes = mutableMapOf<String, JCheckBox>()
     private val detectedGames = mutableListOf<SteamLibraryScanner.SteamGame>()
     val selectedGames = mutableListOf<Game>()
@@ -75,7 +76,7 @@ class AutodetectSteamLibraryDialog(parent: JFrame, existingGames: List<Game>) : 
 
         for (game in detectedGames) {
             val isDuplicate = existingGameNames.contains(game.name.lowercase())
-            
+
             val checkBox = JCheckBox(game.name).apply {
                 isSelected = !isDuplicate
                 isEnabled = !isDuplicate
@@ -101,7 +102,8 @@ class AutodetectSteamLibraryDialog(parent: JFrame, existingGames: List<Game>) : 
         mainPanel.add(scrollPane, BorderLayout.CENTER)
 
         val statsPanel = JPanel(FlowLayout(FlowLayout.LEFT))
-        val statsLabel = JLabel("Found ${detectedGames.size} games ($newGamesCount new, $duplicatesCount already in library)")
+        val statsLabel =
+            JLabel("Found ${detectedGames.size} games ($newGamesCount new, $duplicatesCount already in library)")
         statsLabel.font = statsLabel.font.deriveFont(11f)
         statsPanel.add(statsLabel)
 

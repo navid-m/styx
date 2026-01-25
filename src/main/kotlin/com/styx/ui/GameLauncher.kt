@@ -957,7 +957,7 @@ class GameLauncher : JFrame("Styx") {
     }
 
     private fun autodetectSteamLibrary() {
-        val dialog = AutodetectSteamLibraryDialog(this, games)
+        val dialog = AutoDetectSteamLibraryDialog(this, games)
         dialog.isVisible = true
 
         if (dialog.selectedGames.isNotEmpty()) {
