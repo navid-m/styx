@@ -323,7 +323,7 @@ class GameLauncher : JFrame("Styx") {
     private fun showAboutDialog() {
         val message = """
             <html>
-            <h2>Styx v0.0.4</h2>
+            <h2>Styx v0.0.5</h2>
             <p>A game launcher for Linux</p>
             <br />
             <p>By Navid M</p>
