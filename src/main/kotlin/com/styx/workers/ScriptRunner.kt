@@ -214,7 +214,7 @@ class ScriptRunner(
                                 outputCallback("Detected process, continuing...", "#00aa00")
                                 break
                             }
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             // Ignore
                         }
                     }
